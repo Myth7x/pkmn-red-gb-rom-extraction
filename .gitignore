@@ -1,6 +1,5 @@
 output/
 node_modules/
 *.png
-*.json
 rom/
 *.gb

@@ -1,0 +1,23 @@
+{
+    "name": "pokemon-rom-extractor",
+    "version": "1.0.0",
+    "description": "Extract data from Pokemon Red/Blue ROM files",
+    "main": "src/index.js",
+    "type": "module",
+    "scripts": {
+        "start": "node src/index.js",
+        "extract:pokemon-sprites": "node src/index.js",
+        "extract:all": "node src/index.js"
+    },
+    "keywords": [
+        "pokemon",
+        "rom",
+        "gameboy",
+        "extractor"
+    ],
+    "author": "",
+    "license": "MIT",
+    "dependencies": {
+        "pngjs": "^7.0.0"
+    }
+}
