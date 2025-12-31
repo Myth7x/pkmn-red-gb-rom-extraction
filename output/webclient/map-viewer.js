@@ -2,7 +2,7 @@
 // Renders maps using extracted map data and tileset textures
 
 // Version information
-const MAP_VIEWER_VERSION = '2.1.1';
+const MAP_VIEWER_VERSION = '2.4.1';
 const MAP_VIEWER_BUILD_DATE = '2025-12-31';
 
 console.log('🎮 Pokemon Red Map Viewer - Starting initialization...');
@@ -255,10 +255,8 @@ function setupMouseControls() {
             const worldTileY = Math.floor((canvasY - offsetY) / (TILE_SIZE * scale));
             
             // Convert tile coordinates to block coordinates
-            const screenBlockX = Math.floor(worldTileX / BLOCK_SIZE);
-            const screenBlockY = Math.floor(worldTileY / BLOCK_SIZE);
-            const mapBlockX = screenBlockX - 1;  // Account for border
-            const mapBlockY = screenBlockY - 1;
+            const mapBlockX = Math.floor(worldTileX / BLOCK_SIZE);
+            const mapBlockY = Math.floor(worldTileY / BLOCK_SIZE);
             
             // Calculate which tile within the block (0-15, in 4x4 grid)
             const tileXInBlock = worldTileX % BLOCK_SIZE;
@@ -266,13 +264,13 @@ function setupMouseControls() {
             const tileIndexInBlock = tileYInBlock * BLOCK_SIZE + tileXInBlock;
             
             // Check if within map bounds
-            if (screenBlockX >= 0 && screenBlockX < currentMap.width && 
-                screenBlockY >= 0 && screenBlockY < currentMap.height) {
+            if (mapBlockX >= 0 && mapBlockX < currentMap.width && 
+                mapBlockY >= 0 && mapBlockY < currentMap.height) {
                 
                 // Update hovered tile and re-render if changed
                 const newHovered = {
-                    blockX: screenBlockX, 
-                    blockY: screenBlockY,
+                    blockX: mapBlockX, 
+                    blockY: mapBlockY,
                     tileX: tileXInBlock,
                     tileY: tileYInBlock,
                     tileIndex: tileIndexInBlock,
@@ -287,15 +285,29 @@ function setupMouseControls() {
                     renderMap(); // Re-render to show highlight
                 }
                 
-                showTileTooltip(e.clientX, e.clientY, screenBlockX, screenBlockY, mapBlockX, mapBlockY, 
+                showTileTooltip(e.clientX, e.clientY, mapBlockX, mapBlockY, 
                                 tileXInBlock, tileYInBlock, tileIndexInBlock);
                 
-                // Check if hovering over a warp to change cursor
+                // Check if hovering over a warp or boundary to change cursor
                 if (showOverlays && currentMap.objects) {
+                    // ROM coords are in 2-tile units (metatiles)
+                    const romX = Math.floor(worldTileX / 2);
+                    const romY = Math.floor(worldTileY / 2);
                     const isOverWarp = currentMap.objects.warps?.data?.some(warp => 
-                        warp.x === mapBlockX && warp.y === mapBlockY
+                        warp.x === romX && warp.y === romY
                     );
-                    canvas.style.cursor = isOverWarp ? 'pointer' : 'grab';
+                    
+                    // Check if over boundary connection
+                    const mapWidthTiles = currentMap.width * BLOCK_SIZE;
+                    const mapHeightTiles = currentMap.height * BLOCK_SIZE;
+                    const isOverBoundary = currentMap.connections && (
+                        (currentMap.connections.north && worldTileY === 0) ||
+                        (currentMap.connections.south && worldTileY === mapHeightTiles - 1) ||
+                        (currentMap.connections.west && worldTileX === 0) ||
+                        (currentMap.connections.east && worldTileX === mapWidthTiles - 1)
+                    );
+                    
+                    canvas.style.cursor = (isOverWarp || isOverBoundary) ? 'pointer' : 'grab';
                 } else {
                     canvas.style.cursor = 'grab';
                 }
@@ -341,12 +353,12 @@ function setupMouseControls() {
 }
 
 // Tooltip functions
-function showTileTooltip(mouseX, mouseY, screenBlockX, screenBlockY, mapBlockX, mapBlockY, tileX, tileY, tileIndex) {
+function showTileTooltip(mouseX, mouseY, blockX, blockY, tileX, tileY, tileIndex) {
     const tooltip = document.getElementById('tileTooltip');
     if (!tooltip || !currentMap) return;
     
     // Get block data
-    const blockIndex = screenBlockY * currentMap.width + screenBlockX;
+    const blockIndex = blockY * currentMap.width + blockX;
     const blockId = currentMap.blockData[blockIndex];
     
     // Get tile ID from block definition
@@ -363,8 +375,7 @@ function showTileTooltip(mouseX, mouseY, screenBlockX, screenBlockY, mapBlockX, 
     content += `Tile ID: ${tileId} (0x${typeof tileId === 'number' ? tileId.toString(16).toUpperCase().padStart(2, '0') : '??'})<br>`;
     content += `<div style="border-top: 1px solid #666; margin: 4px 0;"></div>`;
     content += `<div style="font-weight: bold; color: #4ecdc4;">Block Info</div>`;
-    content += `Screen Block: (${screenBlockX}, ${screenBlockY})<br>`;
-    content += `Map Block: (${mapBlockX}, ${mapBlockY})<br>`;
+    content += `Block Position: (${blockX}, ${blockY})<br>`;
     content += `Block ID: ${blockId} (0x${blockId.toString(16).toUpperCase().padStart(2, '0')})<br>`;
     content += `Block Index: ${blockIndex}<br>`;
     
@@ -381,32 +392,34 @@ function showTileTooltip(mouseX, mouseY, screenBlockX, screenBlockY, mapBlockX, 
     }
     
     // Check for objects at this position
-    // Objects use TILE coordinates, same as our map tile system
+    // ROM object coords are in 2-tile units (metatiles)
     if (currentMap.objects) {
         let hasObjects = false;
         let objectsInfo = `<div style="border-top: 1px solid #4ecdc4; margin-top: 4px; padding-top: 4px;">`;
         objectsInfo += `<span style="color: #4ecdc4;">Objects:</span><br>`;
         
-        // Map tile coordinates can be used directly to match ROM coords
-        const mapTileX = mapBlockX * BLOCK_SIZE;
-        const mapTileY = mapBlockY * BLOCK_SIZE;
+        // Convert block coords to tile coords, then to ROM 2-tile units
+        const mapTileX = blockX * BLOCK_SIZE;
+        const mapTileY = blockY * BLOCK_SIZE;
+        const romX = Math.floor(mapTileX / 2);
+        const romY = Math.floor(mapTileY / 2);
         
-        const warp = currentMap.objects.warps?.data?.find(w => w.x === mapTileX && w.y === mapTileY);
+        const warp = currentMap.objects.warps?.data?.find(w => w.x === romX && w.y === romY);
         if (warp) {
             hasObjects = true;
-            objectsInfo += `🚪 Warp → Map ${warp.mapId} (at tile ${warp.x},${warp.y})<br>`;
+            objectsInfo += `🚪 Warp → Map ${warp.mapId} (ROM: ${warp.x},${warp.y})<br>`;
         }
         
-        const sign = currentMap.objects.signs?.data?.find(s => s.x === mapTileX && s.y === mapTileY);
+        const sign = currentMap.objects.signs?.data?.find(s => s.x === romX && s.y === romY);
         if (sign) {
             hasObjects = true;
-            objectsInfo += `📋 Sign (Text ${sign.textId}) (at tile ${sign.x},${sign.y})<br>`;
+            objectsInfo += `📋 Sign (Text ${sign.textId}) (ROM: ${sign.x},${sign.y})<br>`;
         }
         
-        const sprite = currentMap.objects.sprites?.data?.find(s => s.x === mapTileX && s.y === mapTileY);
+        const sprite = currentMap.objects.sprites?.data?.find(s => s.x === romX && s.y === romY);
         if (sprite) {
             hasObjects = true;
-            objectsInfo += `👤 ${sprite.type} (Pic ${sprite.pictureId}) (at tile ${sprite.x},${sprite.y})<br>`;
+            objectsInfo += `👤 ${sprite.type} (Pic ${sprite.pictureId}) (ROM: ${sprite.x},${sprite.y})<br>`;
         }
         
         if (hasObjects) {
@@ -451,19 +464,73 @@ function handleCanvasClick(e) {
     const canvasX = e.clientX - rect.left;
     const canvasY = e.clientY - rect.top;
     
-    // Convert canvas coordinates to map TILE coordinates
-    // ROM object coordinates are in TILE units relative to map origin
-    const worldTileX = Math.floor((canvasX - offsetX) / (TILE_SIZE * scale));
-    const worldTileY = Math.floor((canvasY - offsetY) / (TILE_SIZE * scale));
-    const mapTileX = worldTileX - BLOCK_SIZE;  // Subtract border (4 tiles)
-    const mapTileY = worldTileY - BLOCK_SIZE;
+    // Convert canvas coordinates to TILE coordinates
+    const tileX = Math.floor((canvasX - offsetX) / (TILE_SIZE * scale));
+    const tileY = Math.floor((canvasY - offsetY) / (TILE_SIZE * scale));
     
-    console.log(`🖱️ Clicked at map tile (${mapTileX}, ${mapTileY})`);
+    // ROM object coords are in 2-TILE units (metatiles), so convert tile coords
+    const romX = Math.floor(tileX / 2);
+    const romY = Math.floor(tileY / 2);
     
-    // Check if we clicked on a warp (ROM coords are tile coordinates)
+    console.log(`🖱️ Clicked at tile (${tileX}, ${tileY}) = ROM coords (${romX}, ${romY})`);
+    
+    // Calculate map dimensions in tiles
+    const mapWidthTiles = currentMap.width * BLOCK_SIZE;
+    const mapHeightTiles = currentMap.height * BLOCK_SIZE;
+    
+    // Check if clicked on a map boundary connection (using tile coords)
+    if (currentMap.connections && currentMap.connectionHeaders) {
+        const boundaryThreshold = 1; // One tile width for boundary detection
+        
+        // North boundary (top row of tiles)
+        if (currentMap.connections.north && 
+            tileY >= 0 && tileY < boundaryThreshold &&
+            tileX >= 0 && tileX < mapWidthTiles) {
+            console.log(`🧭 Clicked on NORTH boundary connection`);
+            const connectedMapId = currentMap.connectionHeaders.north.connectedMap;
+            console.log(`   -> Loading connected map: ${connectedMapId}`);
+            loadMap(connectedMapId);
+            return;
+        }
+        
+        // South boundary (bottom row of tiles)
+        if (currentMap.connections.south && 
+            tileY >= mapHeightTiles - boundaryThreshold && tileY < mapHeightTiles &&
+            tileX >= 0 && tileX < mapWidthTiles) {
+            console.log(`🧭 Clicked on SOUTH boundary connection`);
+            const connectedMapId = currentMap.connectionHeaders.south.connectedMap;
+            console.log(`   -> Loading connected map: ${connectedMapId}`);
+            loadMap(connectedMapId);
+            return;
+        }
+        
+        // West boundary (left column of tiles)
+        if (currentMap.connections.west && 
+            tileX >= 0 && tileX < boundaryThreshold &&
+            tileY >= 0 && tileY < mapHeightTiles) {
+            console.log(`🧭 Clicked on WEST boundary connection`);
+            const connectedMapId = currentMap.connectionHeaders.west.connectedMap;
+            console.log(`   -> Loading connected map: ${connectedMapId}`);
+            loadMap(connectedMapId);
+            return;
+        }
+        
+        // East boundary (right column of tiles)
+        if (currentMap.connections.east && 
+            tileX >= mapWidthTiles - boundaryThreshold && tileX < mapWidthTiles &&
+            tileY >= 0 && tileY < mapHeightTiles) {
+            console.log(`🧭 Clicked on EAST boundary connection`);
+            const connectedMapId = currentMap.connectionHeaders.east.connectedMap;
+            console.log(`   -> Loading connected map: ${connectedMapId}`);
+            loadMap(connectedMapId);
+            return;
+        }
+    }
+    
+    // Check if we clicked on a warp (ROM coords are in 2-tile units)
     if (currentMap.objects.warps && currentMap.objects.warps.data) {
         const clickedWarp = currentMap.objects.warps.data.find(warp => 
-            warp.x === mapTileX && warp.y === mapTileY
+            warp.x === romX && warp.y === romY
         );
         
         if (clickedWarp) {
@@ -874,46 +941,91 @@ function renderMap() {
     
     // Helper function to draw object indicator at exact tile position
     function drawObjectIndicator(mapTileX, mapTileY, letter, color, objRomX, objRomY) {
-        // ROM coords are in TILE units relative to map origin (no border)
-        // Add border offset to get screen tile position
-        const screenTileX = mapTileX + BLOCK_SIZE;  // Add 4-tile border
-        const screenTileY = mapTileY + BLOCK_SIZE;
+        // ROM coords are in 2-TILE units (metatiles / 16×16 pixels)
+        // Convert to single tile coordinates by multiplying by 2
+        const tileX = mapTileX * 2;
+        const tileY = mapTileY * 2;
         
-        // Calculate screen pixel position
-        const screenX = offsetX + screenTileX * TILE_SIZE * scale;
-        const screenY = offsetY + screenTileY * TILE_SIZE * scale;
-        const indicatorSize = TILE_SIZE * scale;
+        // Calculate screen pixel position for 2×2 tile area
+        const screenX = offsetX + tileX * TILE_SIZE * scale;
+        const screenY = offsetY + tileY * TILE_SIZE * scale;
+        const metatileSize = 2 * TILE_SIZE * scale; // 2×2 tiles = 16×16 pixels
         
-        // Draw semi-transparent colored background
+        // Draw semi-transparent colored background over 2×2 tile area
         ctx.fillStyle = color;
-        ctx.fillRect(screenX, screenY, indicatorSize, indicatorSize);
+        ctx.fillRect(screenX, screenY, metatileSize, metatileSize);
         
-        // Draw letter indicator
-        const fontSize = Math.max(8, Math.min(14, indicatorSize * 0.6));
+        // Draw letter indicator (centered in 2×2 area)
+        const fontSize = Math.max(12, Math.min(20, metatileSize * 0.4));
         ctx.font = `bold ${fontSize}px "Courier New"`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         
         ctx.strokeStyle = '#000';
-        ctx.lineWidth = Math.max(2, scale * 0.5);
-        ctx.strokeText(letter, screenX + indicatorSize / 2, screenY + indicatorSize / 2);
+        ctx.lineWidth = Math.max(3, scale * 0.8);
+        ctx.strokeText(letter, screenX + metatileSize / 2, screenY + metatileSize / 2);
         
         ctx.fillStyle = '#fff';
-        ctx.fillText(letter, screenX + indicatorSize / 2, screenY + indicatorSize / 2);
+        ctx.fillText(letter, screenX + metatileSize / 2, screenY + metatileSize / 2);
         
-        // Draw coordinate label
-        const coordFontSize = Math.max(6, Math.min(9, indicatorSize * 0.4));
+        // Draw coordinate label (ROM coords)
+        const coordFontSize = Math.max(7, Math.min(11, metatileSize * 0.25));
         ctx.font = `${coordFontSize}px "Courier New"`;
         ctx.textAlign = 'right';
         ctx.textBaseline = 'bottom';
         
         const coordText = `${objRomX}:${objRomY}`;
         ctx.strokeStyle = '#000';
-        ctx.lineWidth = Math.max(1, scale * 0.3);
-        ctx.strokeText(coordText, screenX + indicatorSize - 1, screenY + indicatorSize - 1);
+        ctx.lineWidth = Math.max(2, scale * 0.4);
+        ctx.strokeText(coordText, screenX + metatileSize - 2, screenY + metatileSize - 2);
         
         ctx.fillStyle = '#fff';
-        ctx.fillText(coordText, screenX + indicatorSize - 1, screenY + indicatorSize - 1);
+        ctx.fillText(coordText, screenX + metatileSize - 2, screenY + metatileSize - 2);
+        
+        // Draw metadata icons if available (top-left area)
+        const blockX = Math.floor(tileX / BLOCK_SIZE);
+        const blockY = Math.floor(tileY / BLOCK_SIZE);
+        
+        if (currentMap.tileMetadata) {
+            const iconFontSize = Math.max(8, Math.min(14, metatileSize * 0.25));
+            ctx.font = `${iconFontSize}px Arial`;
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'top';
+            
+            let iconText = '';
+            
+            // Check if this block is in a grass zone
+            if (currentMap.tileMetadata.grassZones) {
+                const isGrass = currentMap.tileMetadata.grassZones.some(zone => 
+                    zone.tiles && zone.tiles.some(tile => tile.x === blockX && tile.y === blockY)
+                );
+                if (isGrass) iconText += '🌱';
+            }
+            
+            // Check if this block is in a water area
+            if (currentMap.tileMetadata.waterAreas) {
+                const isWater = currentMap.tileMetadata.waterAreas.some(area => 
+                    area.tiles && area.tiles.some(tile => tile.x === blockX && tile.y === blockY)
+                );
+                if (isWater) iconText += '💧';
+            }
+            
+            if (iconText) {
+                ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
+                ctx.shadowBlur = 3;
+                ctx.shadowOffsetX = 1;
+                ctx.shadowOffsetY = 1;
+                
+                ctx.fillStyle = '#fff';
+                ctx.fillText(iconText, screenX + 3, screenY + 3);
+                
+                // Reset shadow
+                ctx.shadowColor = 'transparent';
+                ctx.shadowBlur = 0;
+                ctx.shadowOffsetX = 0;
+                ctx.shadowOffsetY = 0;
+            }
+        }
     }
     
     // Calculate visible area
@@ -1002,22 +1114,16 @@ function renderMap() {
                 ctx.textAlign = 'left';
                 ctx.textBaseline = 'top';
                 
-                // Show screen block coords (x,y) and map coords (x-1, y-1)
-                const mapBlockX = x - 1;
-                const mapBlockY = y - 1;
+                // Show block coords directly (no border offset)
                 const coordText = `${x},${y}`;
-                const mapCoordText = `(${mapBlockX},${mapBlockY})`;
                 
                 // Draw with outline for visibility
                 ctx.strokeStyle = '#000';
                 ctx.lineWidth = 2;
                 ctx.strokeText(coordText, screenX + 2, screenY + 2);
-                ctx.strokeText(mapCoordText, screenX + 2, screenY + 2 + coordFontSize + 1);
                 
                 ctx.fillStyle = '#ffff00';  // Yellow for visibility
                 ctx.fillText(coordText, screenX + 2, screenY + 2);
-                ctx.fillStyle = '#00ffff';  // Cyan for map coords
-                ctx.fillText(mapCoordText, screenX + 2, screenY + 2 + coordFontSize + 1);
             }
             
             blocksRendered++;
@@ -1064,108 +1170,59 @@ function renderMap() {
     if (showOverlays && currentMap.connections) {
         console.log(`  🧭 Drawing map connections...`);
         
-        const borderWidth = BLOCK_SIZE * TILE_SIZE * scale; // 4 tiles = 32px * scale
-        const arrowSize = Math.max(16, scale * 8);
-        const connectionColor = 'rgba(255, 200, 0, 0.7)'; // Gold/yellow
+        const connectionColor = 'rgba(255, 140, 0, 0.8)'; // Orange
+        const connectionWidth = TILE_SIZE * scale; // One tile width
         const mapWidthScreen = currentMap.width * BLOCK_SIZE * TILE_SIZE * scale;
         const mapHeightScreen = currentMap.height * BLOCK_SIZE * TILE_SIZE * scale;
         
         // North connection (top edge)
         if (currentMap.connections.north) {
-            const x = offsetX + borderWidth;
-            const y = offsetY + borderWidth;
+            const x = offsetX;
+            const y = offsetY;
             const width = mapWidthScreen;
             
-            // Draw connection indicator bar
+            // Draw single-tile-width orange line along the boundary
             ctx.fillStyle = connectionColor;
-            ctx.fillRect(x, y - 4, width, 4);
-            
-            // Draw arrows
-            for (let i = 0; i < 5; i++) {
-                const arrowX = x + (width / 6) * (i + 1);
-                ctx.fillStyle = connectionColor;
-                ctx.beginPath();
-                ctx.moveTo(arrowX, y - 8);
-                ctx.lineTo(arrowX - arrowSize/2, y - 8 - arrowSize);
-                ctx.lineTo(arrowX + arrowSize/2, y - 8 - arrowSize);
-                ctx.closePath();
-                ctx.fill();
-            }
+            ctx.fillRect(x, y, width, connectionWidth);
             
             console.log(`  ⬆️ North connection visualized`);
         }
         
         // South connection (bottom edge)
         if (currentMap.connections.south) {
-            const x = offsetX + borderWidth;
-            const y = offsetY + borderWidth + mapHeightScreen;
+            const x = offsetX;
+            const y = offsetY + mapHeightScreen - connectionWidth;
             const width = mapWidthScreen;
             
-            // Draw connection indicator bar
+            // Draw single-tile-width orange line along the boundary
             ctx.fillStyle = connectionColor;
-            ctx.fillRect(x, y, width, 4);
-            
-            // Draw arrows
-            for (let i = 0; i < 5; i++) {
-                const arrowX = x + (width / 6) * (i + 1);
-                ctx.fillStyle = connectionColor;
-                ctx.beginPath();
-                ctx.moveTo(arrowX, y + 8);
-                ctx.lineTo(arrowX - arrowSize/2, y + 8 + arrowSize);
-                ctx.lineTo(arrowX + arrowSize/2, y + 8 + arrowSize);
-                ctx.closePath();
-                ctx.fill();
-            }
+            ctx.fillRect(x, y, width, connectionWidth);
             
             console.log(`  ⬇️ South connection visualized`);
         }
         
         // West connection (left edge)
         if (currentMap.connections.west) {
-            const x = offsetX + borderWidth;
-            const y = offsetY + borderWidth;
+            const x = offsetX;
+            const y = offsetY;
             const height = mapHeightScreen;
             
-            // Draw connection indicator bar
+            // Draw single-tile-width orange line along the boundary
             ctx.fillStyle = connectionColor;
-            ctx.fillRect(x - 4, y, 4, height);
-            
-            // Draw arrows
-            for (let i = 0; i < 5; i++) {
-                const arrowY = y + (height / 6) * (i + 1);
-                ctx.fillStyle = connectionColor;
-                ctx.beginPath();
-                ctx.moveTo(x - 8, arrowY);
-                ctx.lineTo(x - 8 - arrowSize, arrowY - arrowSize/2);
-                ctx.lineTo(x - 8 - arrowSize, arrowY + arrowSize/2);
-                ctx.closePath();
-                ctx.fill();
-            }
+            ctx.fillRect(x, y, connectionWidth, height);
             
             console.log(`  ⬅️ West connection visualized`);
         }
         
         // East connection (right edge)
         if (currentMap.connections.east) {
-            const x = offsetX + borderWidth + mapWidthScreen;
-            const y = offsetY + borderWidth;
+            const x = offsetX + mapWidthScreen - connectionWidth;
+            const y = offsetY;
             const height = mapHeightScreen;
             
-            // Draw connection indicator bar
+            // Draw single-tile-width orange line along the boundary
             ctx.fillStyle = connectionColor;
-            ctx.fillRect(x, y, 4, height);
-            
-            // Draw arrows
-            for (let i = 0; i < 5; i++) {
-                const arrowY = y + (height / 6) * (i + 1);
-                ctx.fillStyle = connectionColor;
-                ctx.beginPath();
-                ctx.moveTo(x + 8, arrowY);
-                ctx.lineTo(x + 8 + arrowSize, arrowY - arrowSize/2);
-                ctx.lineTo(x + 8 + arrowSize, arrowY + arrowSize/2);
-                ctx.closePath();
-                ctx.fill();
-            }
+            ctx.fillRect(x, y, connectionWidth, height);
             
             console.log(`  ➡️ East connection visualized`);
         }
