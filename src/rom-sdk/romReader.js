@@ -30,12 +30,11 @@ export function findPattern(rom, pattern) {
  * Get the bank number for a Pokemon by internal ID
  */
 export function getBankRBY(n) {
-  if (n >= 1 && n <= 0x1F) return 0x09;
-  if (n >= 0x20 && n <= 0x3F) return 0x0A;
-  if (n >= 0x40 && n <= 0x5F) return 0x0B;
-  if (n >= 0x60 && n <= 0x7F) return 0x0C;
-  if (n >= 0x80 && n <= 0x9F) return 0x0D;
-  return 0x09;
+  if (n < 0x1F) return 0x09;
+  if (n < 0x4A) return 0x0A;
+  if (n < 0x74) return 0x0B;
+  if (n < 0x99) return 0x0C;
+  return 0x0D;
 }
 
 /**
