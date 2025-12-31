@@ -5,3 +5,6 @@ This project is intended for **research, preservation and educational purposes**
 !WIP!
 
 # Currently working on Mon Sprites (Front & Back)
+- Names done
+- Sprites not 100% correct
+- Tileset currently completly wrong
