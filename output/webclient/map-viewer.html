@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>Pokemon Red - Map Viewer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Courier New', monospace;
+            background: #1a1a1a;
+            color: #fff;
+            overflow: hidden;
+        }
+
+        #container {
+            display: flex;
+            height: 100vh;
+            position: relative;
+        }
+
+        #sidebar {
+            width: 300px;
+            min-width: 250px;
+            max-width: 400px;
+            background: #2a2a2a;
+            border-right: 2px solid #444;
+            overflow-y: auto;
+            padding: 20px;
+            transition: transform 0.3s ease, margin-left 0.3s ease;
+            z-index: 100;
+            position: relative;
+        }
+
+        #sidebar.hidden {
+            transform: translateX(-100%);
+            margin-left: -300px;
+        }
+
+        #toggleSidebarBtn {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 200;
+            background: #4ecdc4;
+            color: #1a1a1a;
+            border: none;
+            padding: 10px 15px;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            border-radius: 5px;
+            transition: all 0.3s;
+            font-size: 20px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            line-height: 1;
+            width: 45px;
+            height: 45px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #toggleSidebarBtn:hover {
+            background: #45b8b0;
+            transform: scale(1.1);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+        }
+
+        #toggleSidebarBtn:active {
+            transform: scale(0.95);
+        }
+
+        #toggleSidebarBtn.sidebar-visible {
+            left: 320px;
+        }
+
+        #mapCanvas {
+            flex: 1;
+            background: #000;
+            cursor: grab;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+        }
+
+        #mapCanvas:active {
+            cursor: grabbing;
+        }
+
+        /* Responsive design */
+        @media (max-width: 768px) {
+            #sidebar {
+                position: fixed;
+                height: 100vh;
+                width: 280px;
+                min-width: 280px;
+                left: 0;
+                top: 0;
+                box-shadow: 2px 0 10px rgba(0, 0, 0, 0.5);
+            }
+
+            #sidebar.hidden {
+                transform: translateX(-100%);
+                margin-left: 0;
+            }
+
+            #toggleSidebarBtn.sidebar-visible {
+                left: 290px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            #sidebar {
+                width: 250px;
+                min-width: 250px;
+                padding: 15px;
+            }
+
+            #toggleSidebarBtn.sidebar-visible {
+                left: 260px;
+            }
+
+            h1 {
+                font-size: 18px;
+            }
+
+            h2 {
+                font-size: 14px;
+            }
+        }
+
+        h1 {
+            font-size: 24px;
+            margin-bottom: 10px;
+            color: #ff6b6b;
+        }
+
+        h2 {
+            font-size: 18px;
+            margin: 20px 0 10px 0;
+            color: #4ecdc4;
+        }
+
+        .map-list {
+            max-height: 400px;
+            overflow-y: auto;
+            border: 1px solid #444;
+            padding: 10px;
+            background: #1a1a1a;
+        }
+
+        .map-item {
+            padding: 8px;
+            margin: 5px 0;
+            background: #333;
+            border: 1px solid #555;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .map-item:hover {
+            background: #444;
+            border-color: #ff6b6b;
+        }
+
+        .map-item.active {
+            background: #ff6b6b;
+            border-color: #ff6b6b;
+            color: #fff;
+        }
+
+        .info {
+            background: #333;
+            padding: 10px;
+            margin: 10px 0;
+            border-left: 3px solid #4ecdc4;
+        }
+
+        .info-row {
+            margin: 5px 0;
+            font-size: 12px;
+        }
+
+        .info-label {
+            color: #888;
+            display: inline-block;
+            width: 80px;
+        }
+
+        .controls {
+            margin: 20px 0;
+        }
+
+        .zoom-controls {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .zoom-controls button {
+            width: 100%;
+            min-width: 120px;
+        }
+
+        button {
+            background: #4ecdc4;
+            border: none;
+            color: #1a1a1a;
+            padding: 8px 16px;
+            margin: 5px 0;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            transition: all 0.2s;
+            border-radius: 3px;
+        }
+
+        button:hover {
+            background: #45b7af;
+            transform: scale(1.05);
+        }
+
+        button:active {
+            transform: scale(0.95);
+        }
+
+        .zoom-controls {
+            margin: 10px 0;
+        }
+
+        #loading {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: #2a2a2a;
+            padding: 30px;
+            border: 2px solid #4ecdc4;
+            border-radius: 10px;
+            text-align: center;
+            z-index: 1000;
+        }
+
+        #loading.hidden {
+            display: none;
+        }
+
+        .spinner {
+            border: 4px solid #444;
+            border-top: 4px solid #4ecdc4;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .metadata {
+            font-size: 11px;
+            color: #888;
+        }
+
+        .error-message {
+            background: #ff4444;
+            color: white;
+            padding: 15px;
+            margin: 10px;
+            border-radius: 5px;
+            display: none;
+        }
+
+        .error-message.show {
+            display: block;
+        }
+
+        .version-footer {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(0, 0, 0, 0.8);
+            color: #4ecdc4;
+            padding: 8px 15px;
+            text-align: center;
+            font-size: 11px;
+            font-family: 'Courier New', monospace;
+            border-top: 1px solid #333;
+            z-index: 1000;
+            backdrop-filter: blur(5px);
+        }
+
+        .script-loading {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.95);
+            color: #4ecdc4;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+            font-family: 'Courier New', monospace;
+        }
+
+        .script-loading h2 {
+            margin: 0 0 20px 0;
+            font-size: 24px;
+            color: #4ecdc4;
+        }
+
+        .script-loading .progress {
+            font-size: 14px;
+            color: #888;
+            margin: 10px 0;
+        }
+
+        .script-loading .spinner-dots {
+            display: flex;
+            gap: 10px;
+            margin: 20px 0;
+        }
+
+        .script-loading .spinner-dots div {
+            width: 12px;
+            height: 12px;
+            background: #4ecdc4;
+            border-radius: 50%;
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        .script-loading .spinner-dots div:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .script-loading .spinner-dots div:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 0.3;
+                transform: scale(0.8);
+            }
+            50% {
+                opacity: 1;
+                transform: scale(1.2);
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Script Loading Overlay -->
+    <div class="script-loading" id="scriptLoading">
+        <h2>🎮 Loading Map Viewer</h2>
+        <div class="spinner-dots">
+            <div></div>
+            <div></div>
+            <div></div>
+        </div>
+        <div class="progress" id="scriptProgress">Fetching latest version from server...</div>
+    </div>
+
+    <div id="loading">
+        <h2>Loading Pokemon Red Map Viewer...</h2>
+        <div class="spinner"></div>
+        <p>Loading map data and tileset textures...</p>
+    </div>
+
+    <div class="error-message" id="errorMessage"></div>
+
+    <!-- Tooltip for tile information -->
+    <div id="tileTooltip" style="display: none; position: fixed; background: rgba(0,0,0,0.9); color: #4ecdc4; padding: 8px 12px; border-radius: 4px; font-family: 'Courier New', monospace; font-size: 11px; pointer-events: none; z-index: 10001; border: 1px solid #4ecdc4; max-width: 300px; line-height: 1.4;"></div>
+
+    <button id="toggleSidebarBtn" class="sidebar-visible" onclick="toggleSidebar()" title="Toggle Sidebar (Tab)">✕</button>
+
+    <div id="container">
+        <div id="sidebar">
+            <h1>🎮 Map Viewer</h1>
+            
+            <div class="controls">
+                <h2>Controls</h2>
+                <div class="zoom-controls">
+                    <button onclick="zoomIn()">Zoom In (+)</button>
+                    <button onclick="zoomOut()">Zoom Out (-)</button>
+                    <button onclick="resetView()">Reset View</button>
+                    <button onclick="toggleOverlays()">Toggle Overlays</button>
+                    <button onclick="toggleCoordLabels()">Toggle Coord Labels</button>
+                </div>
+            </div>
+
+            <div class="info">
+                <h2>Current Map</h2>
+                <div class="info-row">
+                    <span class="info-label">Name:</span>
+                    <span id="mapName">-</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">ID:</span>
+                    <span id="mapId">-</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Size:</span>
+                    <span id="mapSize">-</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Tileset:</span>
+                    <span id="mapTileset">-</span>
+                </div>
+            </div>
+
+            <div class="info" id="metadataInfo" style="display: none;">
+                <h2>Tile Metadata</h2>
+                <div class="metadata" id="metadataContent"></div>
+            </div>
+
+            <h2>Available Maps</h2>
+            <div class="map-list" id="mapList">
+                <p>Loading maps...</p>
+            </div>
+        </div>
+
+        <canvas id="mapCanvas"></canvas>
+    </div>
+
+    <!-- Version Footer -->
+    <div class="version-footer" id="versionFooter">
+        Loading...
+    </div>
+
+    <script>
+        // Cache-busting script loader with visual feedback
+        (function() {
+            const scriptProgress = document.getElementById('scriptProgress');
+            const scriptLoading = document.getElementById('scriptLoading');
+            
+            // Generate timestamp-based cache buster
+            const cacheBuster = new Date().getTime();
+            
+            // Show loading progress
+            scriptProgress.textContent = `Fetching map-viewer.js?t=${cacheBuster}`;
+            
+            // Create script element with aggressive cache-busting
+            const script = document.createElement('script');
+            script.src = `map-viewer.js?t=${cacheBuster}&nocache=${Math.random()}`;
+            
+            // Add cache control headers via fetch first to ensure fresh load
+            fetch(script.src, {
+                cache: 'no-store',
+                headers: {
+                    'Cache-Control': 'no-cache, no-store, must-revalidate',
+                    'Pragma': 'no-cache',
+                    'Expires': '0'
+                }
+            })
+            .then(response => {
+                scriptProgress.textContent = `Script fetched (${(response.headers.get('content-length') / 1024).toFixed(1)} KB) - Loading...`;
+                return response.text();
+            })
+            .then(code => {
+                scriptProgress.textContent = 'Executing script...';
+                
+                // Execute the code in document body to ensure DOM is ready
+                const execScript = document.createElement('script');
+                execScript.textContent = code;
+                document.body.appendChild(execScript);
+                
+                // Manually trigger init if DOMContentLoaded already fired
+                setTimeout(() => {
+                    if (document.readyState === 'complete' || document.readyState === 'interactive') {
+                        console.log('📌 DOM already loaded, triggering init manually');
+                        if (window.init && typeof window.init === 'function') {
+                            window.init();
+                        }
+                    }
+                }, 100);
+                
+                // Hide script loading overlay after a brief delay
+                setTimeout(() => {
+                    scriptProgress.textContent = 'Ready!';
+                    setTimeout(() => {
+                        scriptLoading.style.display = 'none';
+                    }, 300);
+                }, 500);
+            })
+            .catch(error => {
+                scriptProgress.textContent = `❌ Error loading script: ${error.message}`;
+                scriptProgress.style.color = '#ff4444';
+                console.error('Script loading error:', error);
+                
+                // Fallback to regular script tag
+                setTimeout(() => {
+                    scriptProgress.textContent = 'Trying fallback method...';
+                    document.body.appendChild(script);
+                    setTimeout(() => {
+                        scriptLoading.style.display = 'none';
+                    }, 1000);
+                }, 2000);
+            });
+        })();
+    </script>
+</body>
+</html>
