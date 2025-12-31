@@ -1,0 +1,827 @@
+{
+  "metadata": {
+    "generatedAt": "2025-12-31T19:07:56.341Z",
+    "totalMaps": 39,
+    "totalConnections": 62,
+    "validConnections": 3,
+    "islands": 37
+  },
+  "nodes": [
+    {
+      "mapId": 8,
+      "name": "Cinnabar Island",
+      "width": 234,
+      "height": 211,
+      "tileset": "Tileset 154",
+      "connectionCount": 2,
+      "islandId": 0
+    },
+    {
+      "mapId": 12,
+      "name": "Route 1",
+      "width": 201,
+      "height": 224,
+      "tileset": "Tileset 32",
+      "connectionCount": 3,
+      "islandId": 1
+    },
+    {
+      "mapId": 16,
+      "name": "Route 5",
+      "width": 55,
+      "height": 35,
+      "tileset": "Tileset 177",
+      "connectionCount": 0,
+      "islandId": 2
+    },
+    {
+      "mapId": 18,
+      "name": "Route 7",
+      "width": 241,
+      "height": 14,
+      "tileset": "Tileset 68",
+      "connectionCount": 3,
+      "islandId": 3
+    },
+    {
+      "mapId": 26,
+      "name": "Route 15",
+      "width": 205,
+      "height": 208,
+      "tileset": "Tileset 155",
+      "connectionCount": 4,
+      "islandId": 4
+    },
+    {
+      "mapId": 34,
+      "name": "Route 23",
+      "width": 120,
+      "height": 16,
+      "tileset": "Tileset 56",
+      "connectionCount": 1,
+      "islandId": 5
+    },
+    {
+      "mapId": 36,
+      "name": "Route 25",
+      "width": 0,
+      "height": 0,
+      "tileset": "OVERWORLD",
+      "connectionCount": 0,
+      "islandId": 6
+    },
+    {
+      "mapId": 38,
+      "name": "Map 38",
+      "width": 0,
+      "height": 0,
+      "tileset": "OVERWORLD",
+      "connectionCount": 0,
+      "islandId": 7
+    },
+    {
+      "mapId": 48,
+      "name": "Map 48",
+      "width": 181,
+      "height": 227,
+      "tileset": "Tileset 219",
+      "connectionCount": 3,
+      "islandId": 8
+    },
+    {
+      "mapId": 52,
+      "name": "Map 52",
+      "width": 0,
+      "height": 0,
+      "tileset": "OVERWORLD",
+      "connectionCount": 0,
+      "islandId": 9
+    },
+    {
+      "mapId": 56,
+      "name": "Map 56",
+      "width": 172,
+      "height": 127,
+      "tileset": "Tileset 136",
+      "connectionCount": 1,
+      "islandId": 10
+    },
+    {
+      "mapId": 58,
+      "name": "Map 58",
+      "width": 0,
+      "height": 0,
+      "tileset": "OVERWORLD",
+      "connectionCount": 0,
+      "islandId": 11
+    },
+    {
+      "mapId": 66,
+      "name": "Map 66",
+      "width": 205,
+      "height": 150,
+      "tileset": "Tileset 203",
+      "connectionCount": 2,
+      "islandId": 12
+    },
+    {
+      "mapId": 68,
+      "name": "Map 68",
+      "width": 0,
+      "height": 0,
+      "tileset": "OVERWORLD",
+      "connectionCount": 0,
+      "islandId": 13
+    },
+    {
+      "mapId": 78,
+      "name": "Map 78",
+      "width": 0,
+      "height": 0,
+      "tileset": "OVERWORLD",
+      "connectionCount": 0,
+      "islandId": 14
+    },
+    {
+      "mapId": 80,
+      "name": "Map 80",
+      "width": 115,
+      "height": 9,
+      "tileset": "Tileset 192",
+      "connectionCount": 3,
+      "islandId": 15
+    },
+    {
+      "mapId": 102,
+      "name": "Map 102",
+      "width": 42,
+      "height": 1,
+      "tileset": "OVERWORLD",
+      "connectionCount": 3,
+      "islandId": 16
+    },
+    {
+      "mapId": 106,
+      "name": "Map 106",
+      "width": 52,
+      "height": 169,
+      "tileset": "Tileset 193",
+      "connectionCount": 2,
+      "islandId": 17
+    },
+    {
+      "mapId": 114,
+      "name": "Map 114",
+      "width": 0,
+      "height": 0,
+      "tileset": "OVERWORLD",
+      "connectionCount": 0,
+      "islandId": 18
+    },
+    {
+      "mapId": 120,
+      "name": "Map 120",
+      "width": 0,
+      "height": 0,
+      "tileset": "OVERWORLD",
+      "connectionCount": 0,
+      "islandId": 19
+    },
+    {
+      "mapId": 128,
+      "name": "Map 128",
+      "width": 0,
+      "height": 0,
+      "tileset": "OVERWORLD",
+      "connectionCount": 0,
+      "islandId": 20
+    },
+    {
+      "mapId": 132,
+      "name": "Map 132",
+      "width": 0,
+      "height": 0,
+      "tileset": "OVERWORLD",
+      "connectionCount": 0,
+      "islandId": 21
+    },
+    {
+      "mapId": 140,
+      "name": "Map 140",
+      "width": 181,
+      "height": 164,
+      "tileset": "Tileset 127",
+      "connectionCount": 3,
+      "islandId": 22
+    },
+    {
+      "mapId": 146,
+      "name": "Map 146",
+      "width": 0,
+      "height": 0,
+      "tileset": "OVERWORLD",
+      "connectionCount": 0,
+      "islandId": 23
+    },
+    {
+      "mapId": 154,
+      "name": "Map 154",
+      "width": 127,
+      "height": 178,
+      "tileset": "Tileset 160",
+      "connectionCount": 2,
+      "islandId": 24
+    },
+    {
+      "mapId": 168,
+      "name": "Map 168",
+      "width": 40,
+      "height": 104,
+      "tileset": "Tileset 203",
+      "connectionCount": 3,
+      "islandId": 25
+    },
+    {
+      "mapId": 184,
+      "name": "Map 184",
+      "width": 3,
+      "height": 253,
+      "tileset": "FOREST",
+      "connectionCount": 4,
+      "islandId": 26
+    },
+    {
+      "mapId": 194,
+      "name": "Map 194",
+      "width": 79,
+      "height": 177,
+      "tileset": "Tileset 164",
+      "connectionCount": 3,
+      "islandId": 27
+    },
+    {
+      "mapId": 196,
+      "name": "Map 196",
+      "width": 179,
+      "height": 79,
+      "tileset": "Tileset 132",
+      "connectionCount": 2,
+      "islandId": 3
+    },
+    {
+      "mapId": 206,
+      "name": "Map 206",
+      "width": 0,
+      "height": 0,
+      "tileset": "OVERWORLD",
+      "connectionCount": 0,
+      "islandId": 28
+    },
+    {
+      "mapId": 232,
+      "name": "Map 232",
+      "width": 71,
+      "height": 105,
+      "tileset": "Tileset 96",
+      "connectionCount": 3,
+      "islandId": 29
+    },
+    {
+      "mapId": 235,
+      "name": "Map 235",
+      "width": 245,
+      "height": 184,
+      "tileset": "Tileset 240",
+      "connectionCount": 1,
+      "islandId": 30
+    },
+    {
+      "mapId": 239,
+      "name": "Map 239",
+      "width": 245,
+      "height": 184,
+      "tileset": "Tileset 240",
+      "connectionCount": 3,
+      "islandId": 31
+    },
+    {
+      "mapId": 240,
+      "name": "Map 240",
+      "width": 114,
+      "height": 94,
+      "tileset": "Tileset 114",
+      "connectionCount": 2,
+      "islandId": 32
+    },
+    {
+      "mapId": 241,
+      "name": "Map 241",
+      "width": 240,
+      "height": 204,
+      "tileset": "Tileset 210",
+      "connectionCount": 2,
+      "islandId": 33
+    },
+    {
+      "mapId": 243,
+      "name": "Map 243",
+      "width": 245,
+      "height": 184,
+      "tileset": "Tileset 240",
+      "connectionCount": 1,
+      "islandId": 34
+    },
+    {
+      "mapId": 244,
+      "name": "Map 244",
+      "width": 14,
+      "height": 17,
+      "tileset": "Tileset 195",
+      "connectionCount": 2,
+      "islandId": 10
+    },
+    {
+      "mapId": 246,
+      "name": "Map 246",
+      "width": 17,
+      "height": 8,
+      "tileset": "Tileset 32",
+      "connectionCount": 2,
+      "islandId": 35
+    },
+    {
+      "mapId": 247,
+      "name": "Map 247",
+      "width": 201,
+      "height": 114,
+      "tileset": "LAB",
+      "connectionCount": 2,
+      "islandId": 36
+    }
+  ],
+  "edges": [
+    {
+      "from": 18,
+      "to": 196,
+      "direction": "NORTH"
+    },
+    {
+      "from": 56,
+      "to": 244,
+      "direction": "NORTH"
+    },
+    {
+      "from": 140,
+      "to": 140,
+      "direction": "EAST"
+    }
+  ],
+  "islands": [
+    {
+      "islandId": 0,
+      "maps": [
+        {
+          "mapId": 8,
+          "name": "Cinnabar Island",
+          "tileset": "Tileset 154"
+        }
+      ]
+    },
+    {
+      "islandId": 1,
+      "maps": [
+        {
+          "mapId": 12,
+          "name": "Route 1",
+          "tileset": "Tileset 32"
+        }
+      ]
+    },
+    {
+      "islandId": 2,
+      "maps": [
+        {
+          "mapId": 16,
+          "name": "Route 5",
+          "tileset": "Tileset 177"
+        }
+      ]
+    },
+    {
+      "islandId": 3,
+      "maps": [
+        {
+          "mapId": 18,
+          "name": "Route 7",
+          "tileset": "Tileset 68"
+        },
+        {
+          "mapId": 196,
+          "name": "Map 196",
+          "tileset": "Tileset 132"
+        }
+      ]
+    },
+    {
+      "islandId": 4,
+      "maps": [
+        {
+          "mapId": 26,
+          "name": "Route 15",
+          "tileset": "Tileset 155"
+        }
+      ]
+    },
+    {
+      "islandId": 5,
+      "maps": [
+        {
+          "mapId": 34,
+          "name": "Route 23",
+          "tileset": "Tileset 56"
+        }
+      ]
+    },
+    {
+      "islandId": 6,
+      "maps": [
+        {
+          "mapId": 36,
+          "name": "Route 25",
+          "tileset": "OVERWORLD"
+        }
+      ]
+    },
+    {
+      "islandId": 7,
+      "maps": [
+        {
+          "mapId": 38,
+          "name": "Map 38",
+          "tileset": "OVERWORLD"
+        }
+      ]
+    },
+    {
+      "islandId": 8,
+      "maps": [
+        {
+          "mapId": 48,
+          "name": "Map 48",
+          "tileset": "Tileset 219"
+        }
+      ]
+    },
+    {
+      "islandId": 9,
+      "maps": [
+        {
+          "mapId": 52,
+          "name": "Map 52",
+          "tileset": "OVERWORLD"
+        }
+      ]
+    },
+    {
+      "islandId": 10,
+      "maps": [
+        {
+          "mapId": 56,
+          "name": "Map 56",
+          "tileset": "Tileset 136"
+        },
+        {
+          "mapId": 244,
+          "name": "Map 244",
+          "tileset": "Tileset 195"
+        }
+      ]
+    },
+    {
+      "islandId": 11,
+      "maps": [
+        {
+          "mapId": 58,
+          "name": "Map 58",
+          "tileset": "OVERWORLD"
+        }
+      ]
+    },
+    {
+      "islandId": 12,
+      "maps": [
+        {
+          "mapId": 66,
+          "name": "Map 66",
+          "tileset": "Tileset 203"
+        }
+      ]
+    },
+    {
+      "islandId": 13,
+      "maps": [
+        {
+          "mapId": 68,
+          "name": "Map 68",
+          "tileset": "OVERWORLD"
+        }
+      ]
+    },
+    {
+      "islandId": 14,
+      "maps": [
+        {
+          "mapId": 78,
+          "name": "Map 78",
+          "tileset": "OVERWORLD"
+        }
+      ]
+    },
+    {
+      "islandId": 15,
+      "maps": [
+        {
+          "mapId": 80,
+          "name": "Map 80",
+          "tileset": "Tileset 192"
+        }
+      ]
+    },
+    {
+      "islandId": 16,
+      "maps": [
+        {
+          "mapId": 102,
+          "name": "Map 102",
+          "tileset": "OVERWORLD"
+        }
+      ]
+    },
+    {
+      "islandId": 17,
+      "maps": [
+        {
+          "mapId": 106,
+          "name": "Map 106",
+          "tileset": "Tileset 193"
+        }
+      ]
+    },
+    {
+      "islandId": 18,
+      "maps": [
+        {
+          "mapId": 114,
+          "name": "Map 114",
+          "tileset": "OVERWORLD"
+        }
+      ]
+    },
+    {
+      "islandId": 19,
+      "maps": [
+        {
+          "mapId": 120,
+          "name": "Map 120",
+          "tileset": "OVERWORLD"
+        }
+      ]
+    },
+    {
+      "islandId": 20,
+      "maps": [
+        {
+          "mapId": 128,
+          "name": "Map 128",
+          "tileset": "OVERWORLD"
+        }
+      ]
+    },
+    {
+      "islandId": 21,
+      "maps": [
+        {
+          "mapId": 132,
+          "name": "Map 132",
+          "tileset": "OVERWORLD"
+        }
+      ]
+    },
+    {
+      "islandId": 22,
+      "maps": [
+        {
+          "mapId": 140,
+          "name": "Map 140",
+          "tileset": "Tileset 127"
+        }
+      ]
+    },
+    {
+      "islandId": 23,
+      "maps": [
+        {
+          "mapId": 146,
+          "name": "Map 146",
+          "tileset": "OVERWORLD"
+        }
+      ]
+    },
+    {
+      "islandId": 24,
+      "maps": [
+        {
+          "mapId": 154,
+          "name": "Map 154",
+          "tileset": "Tileset 160"
+        }
+      ]
+    },
+    {
+      "islandId": 25,
+      "maps": [
+        {
+          "mapId": 168,
+          "name": "Map 168",
+          "tileset": "Tileset 203"
+        }
+      ]
+    },
+    {
+      "islandId": 26,
+      "maps": [
+        {
+          "mapId": 184,
+          "name": "Map 184",
+          "tileset": "FOREST"
+        }
+      ]
+    },
+    {
+      "islandId": 27,
+      "maps": [
+        {
+          "mapId": 194,
+          "name": "Map 194",
+          "tileset": "Tileset 164"
+        }
+      ]
+    },
+    {
+      "islandId": 28,
+      "maps": [
+        {
+          "mapId": 206,
+          "name": "Map 206",
+          "tileset": "OVERWORLD"
+        }
+      ]
+    },
+    {
+      "islandId": 29,
+      "maps": [
+        {
+          "mapId": 232,
+          "name": "Map 232",
+          "tileset": "Tileset 96"
+        }
+      ]
+    },
+    {
+      "islandId": 30,
+      "maps": [
+        {
+          "mapId": 235,
+          "name": "Map 235",
+          "tileset": "Tileset 240"
+        }
+      ]
+    },
+    {
+      "islandId": 31,
+      "maps": [
+        {
+          "mapId": 239,
+          "name": "Map 239",
+          "tileset": "Tileset 240"
+        }
+      ]
+    },
+    {
+      "islandId": 32,
+      "maps": [
+        {
+          "mapId": 240,
+          "name": "Map 240",
+          "tileset": "Tileset 114"
+        }
+      ]
+    },
+    {
+      "islandId": 33,
+      "maps": [
+        {
+          "mapId": 241,
+          "name": "Map 241",
+          "tileset": "Tileset 210"
+        }
+      ]
+    },
+    {
+      "islandId": 34,
+      "maps": [
+        {
+          "mapId": 243,
+          "name": "Map 243",
+          "tileset": "Tileset 240"
+        }
+      ]
+    },
+    {
+      "islandId": 35,
+      "maps": [
+        {
+          "mapId": 246,
+          "name": "Map 246",
+          "tileset": "Tileset 32"
+        }
+      ]
+    },
+    {
+      "islandId": 36,
+      "maps": [
+        {
+          "mapId": 247,
+          "name": "Map 247",
+          "tileset": "LAB"
+        }
+      ]
+    }
+  ],
+  "errors": [
+    "Map 8 (Cinnabar Island) → NORTH → Map 153 DOES NOT EXIST",
+    "Map 8 (Cinnabar Island) → WEST → Map 250 DOES NOT EXIST",
+    "Map 12 (Route 1) → SOUTH → Map 40 DOES NOT EXIST",
+    "Map 12 (Route 1) → WEST → Map 176 DOES NOT EXIST",
+    "Map 12 (Route 1) → EAST → Map 24 DOES NOT EXIST",
+    "Map 18 (Route 7) → WEST → Map 25 DOES NOT EXIST",
+    "Map 18 (Route 7) → EAST → Map 127 DOES NOT EXIST",
+    "Map 26 (Route 15) → NORTH → Map 234 DOES NOT EXIST",
+    "Map 26 (Route 15) → SOUTH → Map 215 DOES NOT EXIST",
+    "Map 26 (Route 15) → WEST → Map 224 DOES NOT EXIST",
+    "Map 26 (Route 15) → EAST → Map 25 DOES NOT EXIST",
+    "Map 34 (Route 23) → NORTH → Map 254 DOES NOT EXIST",
+    "Map 48 (Map 48) → NORTH → Map 234 DOES NOT EXIST",
+    "Map 48 (Map 48) → SOUTH → Map 179 DOES NOT EXIST",
+    "Map 48 (Map 48) → EAST → Map 182 DOES NOT EXIST",
+    "Map 66 (Map 66) → NORTH → Map 250 DOES NOT EXIST",
+    "Map 66 (Map 66) → SOUTH → Map 234 DOES NOT EXIST",
+    "Map 80 (Map 80) → NORTH → Map 230 DOES NOT EXIST",
+    "Map 80 (Map 80) → WEST → Map 17 DOES NOT EXIST",
+    "Map 80 (Map 80) → EAST → Map 62 DOES NOT EXIST",
+    "Map 102 (Map 102) → SOUTH → Map 4 DOES NOT EXIST",
+    "Map 102 (Map 102) → WEST → Map 200 DOES NOT EXIST",
+    "Map 102 (Map 102) → EAST → Map 45 DOES NOT EXIST",
+    "Map 106 (Map 106) → SOUTH → Map 42 DOES NOT EXIST",
+    "Map 106 (Map 106) → WEST → Map 57 DOES NOT EXIST",
+    "Map 140 (Map 140) → NORTH → Map 166 DOES NOT EXIST",
+    "Map 140 (Map 140) → SOUTH → Map 127 DOES NOT EXIST",
+    "Map 154 (Map 154) → WEST → Map 174 DOES NOT EXIST",
+    "Map 154 (Map 154) → EAST → Map 172 DOES NOT EXIST",
+    "Map 168 (Map 168) → NORTH → Map 211 DOES NOT EXIST",
+    "Map 168 (Map 168) → SOUTH → Map 40 DOES NOT EXIST",
+    "Map 168 (Map 168) → EAST → Map 203 DOES NOT EXIST",
+    "Map 184 (Map 184) → NORTH → Map 191 DOES NOT EXIST",
+    "Map 184 (Map 184) → SOUTH → Map 64 DOES NOT EXIST",
+    "Map 184 (Map 184) → WEST → Map 5 DOES NOT EXIST",
+    "Map 184 (Map 184) → EAST → Map 255 DOES NOT EXIST",
+    "Map 194 (Map 194) → NORTH → Map 164 DOES NOT EXIST",
+    "Map 194 (Map 194) → SOUTH → Map 160 DOES NOT EXIST",
+    "Map 194 (Map 194) → EAST → Map 0 DOES NOT EXIST",
+    "Map 196 (Map 196) → NORTH → Map 160 DOES NOT EXIST",
+    "Map 196 (Map 196) → SOUTH → Map 0 DOES NOT EXIST",
+    "Map 232 (Map 232) → NORTH → Map 55 DOES NOT EXIST",
+    "Map 232 (Map 232) → WEST → Map 85 DOES NOT EXIST",
+    "Map 232 (Map 232) → EAST → Map 5 DOES NOT EXIST",
+    "Map 235 (Map 235) → EAST → Map 228 DOES NOT EXIST",
+    "Map 239 (Map 239) → SOUTH → Map 213 DOES NOT EXIST",
+    "Map 239 (Map 239) → WEST → Map 207 DOES NOT EXIST",
+    "Map 239 (Map 239) → EAST → Map 160 DOES NOT EXIST",
+    "Map 240 (Map 240) → NORTH → Map 81 DOES NOT EXIST",
+    "Map 240 (Map 240) → SOUTH → Map 85 DOES NOT EXIST",
+    "Map 241 (Map 241) → SOUTH → Map 62 DOES NOT EXIST",
+    "Map 241 (Map 241) → EAST → Map 53 DOES NOT EXIST",
+    "Map 243 (Map 243) → EAST → Map 228 DOES NOT EXIST",
+    "Map 244 (Map 244) → WEST → Map 205 DOES NOT EXIST",
+    "Map 244 (Map 244) → EAST → Map 254 DOES NOT EXIST",
+    "Map 246 (Map 246) → SOUTH → Map 17 DOES NOT EXIST",
+    "Map 246 (Map 246) → WEST → Map 234 DOES NOT EXIST",
+    "Map 247 (Map 247) → SOUTH → Map 229 DOES NOT EXIST",
+    "Map 247 (Map 247) → WEST → Map 91 DOES NOT EXIST"
+  ],
+  "warnings": [
+    "Map 18 (Route 7) → NORTH → Map 196 (Map 196) has no reverse connection",
+    "Map 56 (Map 56) → NORTH → Map 244 (Map 244) has no reverse connection",
+    "Map 140 (Map 140) → EAST → Map 140 (Map 140) has no reverse connection"
+  ]
+}

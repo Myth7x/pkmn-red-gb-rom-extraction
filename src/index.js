@@ -2,9 +2,14 @@
  * Pokemon Red ROM Extractor
  * 
  * Main orchestrator for extracting all data from Pokemon Red/Blue/Yellow ROMs.
- * Coordinates extraction of Pokemon names (190 total), front/back sprites (151 Pokemon),
- * and map tilesets (24 total). Manages output directory structure, JSON metadata generation,
- * progress reporting, and error handling for the entire extraction pipeline.
+ * Supports modular extraction: all, pkmn, maps, tilesets, names
+ * 
+ * Usage: node src/index.js [command]
+ *   all       - Extract everything (default)
+ *   pkmn      - Extract Pokemon names and sprites only
+ *   maps      - Extract map data only
+ *   tilesets  - Extract tileset graphics only
+ *   names     - Extract Pokemon names only
  */
 
 import fs from 'fs';
@@ -16,12 +21,11 @@ import { loadROM } from './rom-sdk/romReader.js';
 import { extractSpriteData } from './rom-sdk/spriteExtractor.js';
 import { decompressSprite } from './rom-sdk/spriteDecompressor.js';
 import { extractPokemonNames, getPokemonNameByInternalId } from './rom-sdk/nameExtractor.js';
-import { extractAllTilesets } from './rom-sdk/tilesetExtractor.js';
+import { extractAllMaps, extractAllTilesets, addTileMetadataToMaps, saveMapDataJSON, saveTilesetDataJSON, exportTilesetGraphics } from './rom-sdk/mapDataExtractor.js';
 
 // Utils imports
 import { GAMEBOY_PALETTE, GRAY_PALETTE } from './utils/palettes.js';
 import { savePNG } from './utils/pngExporter.js';
-import { saveTilesetPNG } from './utils/tilesetPngExporter.js';
 import ProgressBar from './utils/progressBar.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -49,14 +53,24 @@ const POKEDEX_TO_NAME_INDEX = [
 ];
 
 /**
- * Clear output directory
+ * Clear output directory (excluding webclient)
  * @param {String} dirPath - Directory to clear
  */
 function clearDirectory(dirPath) {
   if (fs.existsSync(dirPath)) {
-    fs.rmSync(dirPath, { recursive: true, force: true });
+    // Get all items in directory
+    const items = fs.readdirSync(dirPath);
+    
+    // Remove everything except webclient
+    for (const item of items) {
+      if (item !== 'webclient') {
+        const itemPath = path.join(dirPath, item);
+        fs.rmSync(itemPath, { recursive: true, force: true });
+      }
+    }
+  } else {
+    fs.mkdirSync(dirPath, { recursive: true });
   }
-  fs.mkdirSync(dirPath, { recursive: true });
 }
 
 /**
@@ -165,106 +179,165 @@ function extractPokemonSprites(romPath, outputDir, spriteType = 'front', pokemon
 }
 
 /**
- * Extract tileset graphics from ROM
+ * Extract Pokemon names only
+ * @param {String} romPath - Path to ROM file
+ * @param {String} outputDir - Output directory
+ * @returns {Array<string>} Pokemon names
+ */
+function extractNames(romPath, outputDir) {
+  ProgressBar.header('Pokemon Red - Name Extractor');
+  
+  console.log('Extracting Pokemon names from ROM...\n');
+  const rom = loadROM(romPath);
+  const pokemonNames = extractPokemonNames(rom);
+  
+  // Save Pokemon names to JSON
+  const namesJsonPath = path.join(outputDir, 'pokemon_names.json');
+  saveJSON(namesJsonPath, {
+    extractionDate: new Date().toISOString(),
+    totalNames: pokemonNames.length,
+    names: pokemonNames.map((name, index) => ({
+      internalId: index + 1,
+      name: name
+    }))
+  });
+  
+  console.log(`[OK] Pokemon names extracted successfully!`);
+  console.log(`  Total names: ${pokemonNames.length}`);
+  console.log(`  Output: ${namesJsonPath}\n`);
+  
+  return pokemonNames;
+}
+
+/**
+ * Extract map data
  * @param {String} romPath - Path to ROM file
  * @param {String} outputDir - Output directory
  */
-function extractTilesets(romPath, outputDir) {
-  ProgressBar.header('Pokemon Red - Tileset Extractor');
+function extractMaps(romPath, outputDir) {
+  ProgressBar.header('Pokemon Red - Map Data Extractor');
   
   const rom = loadROM(romPath);
   
-  // Create output directory for tilesets
-  const tilesetsDir = path.join(outputDir, 'tilesets');
-  clearDirectory(tilesetsDir);
+  console.log('Extracting map data from ROM...\n');
   
-  ProgressBar.section(`Extracting tilesets to: ${tilesetsDir}`);
+  // Extract map data
+  const mapData = extractAllMaps(rom);
   
-  // Extract all tilesets
-  const { tilesets, errors } = extractAllTilesets(rom);
+  console.log('\nExtracting tileset data from ROM...\n');
   
-  // Create progress bar
-  const progress = new ProgressBar({
-    total: tilesets.length,
-    title: 'Extracting tilesets',
-    width: 40,
-    showETA: true
-  });
+  // Extract complete tileset data with graphics
+  const tilesetData = extractAllTilesets(rom);
   
-  const extractedTilesets = [];
+  // Add tile metadata to maps
+  const mapDataWithMetadata = addTileMetadataToMaps(mapData, tilesetData);
   
-  for (const tileset of tilesets) {
-    try {
-      const filename = `${String(tileset.id).padStart(2, '0')}_${tileset.name}.png`;
-      const outputPath = path.join(tilesetsDir, filename);
-      
-      saveTilesetPNG(tileset, outputPath, GRAY_PALETTE);
-      
-      extractedTilesets.push({
-        id: tileset.id,
-        name: tileset.name,
-        tileCount: tileset.tiles.length,
-        gfxOffset: `0x${tileset.gfxOffset.toString(16).toUpperCase()}`,
-        filename: filename
-      });
-      
-      progress.success(`${tileset.name} (${tileset.tiles.length} tiles)`);
-    } catch (error) {
-      progress.error(tileset.name, error.message);
+  // Save map data
+  const mapOutputDir = path.join(outputDir, 'map-data');
+  saveMapDataJSON(mapDataWithMetadata, mapOutputDir);
+  
+  // Save tileset data
+  saveTilesetDataJSON(tilesetData, mapOutputDir);
+  
+  // Export tileset graphics as PNG textures
+  console.log('\nExporting tileset graphics as textures...\n');
+  const texturesDir = path.join(mapOutputDir, 'textures');
+  exportTilesetGraphics(rom, tilesetData, texturesDir);
+  
+  console.log('\n[OK] Map data extraction complete!');
+  console.log(`  Output: ${mapOutputDir}\n`);
+}
+
+/**
+ * Main execution function
+ */
+function main() {
+  // Get command from arguments (default: 'all')
+  const command = process.argv[2] || 'all';
+  
+  const romPath = path.join(__dirname, '..', 'rom', 'Pokemon - Red Version (USA, Europe).gb');
+  const outputDir = path.join(__dirname, '..', 'output');
+  
+  // Validate command
+  const validCommands = ['all', 'pkmn', 'maps', 'names'];
+  if (!validCommands.includes(command)) {
+    console.error(`\n[ERROR] Invalid command: "${command}"`);
+    console.error(`Valid commands: ${validCommands.join(', ')}\n`);
+    process.exit(1);
+  }
+  
+  console.log('\n============================================================');
+  console.log(`Pokemon Red ROM Extractor - Mode: ${command.toUpperCase()}`);
+  console.log('============================================================\n');
+  
+  // Clear output directory based on command
+  if (command === 'all') {
+    console.log('Clearing output directory...');
+    clearDirectory(outputDir);
+  } else if (command === 'pkmn') {
+    console.log('Clearing Pokemon sprites directory...');
+    const spritesDir = path.join(outputDir, 'pokemon-sprites');
+    if (fs.existsSync(spritesDir)) {
+      fs.rmSync(spritesDir, { recursive: true, force: true });
+    }
+  } else if (command === 'maps') {
+    console.log('Clearing map data directory...');
+    const mapsDir = path.join(outputDir, 'map-data');
+    if (fs.existsSync(mapsDir)) {
+      fs.rmSync(mapsDir, { recursive: true, force: true });
     }
   }
   
-  // Complete the progress bar
-  progress.complete('Tileset extraction complete!');
+  // Ensure output directory exists
+  fs.mkdirSync(outputDir, { recursive: true });
   
-  // Save extraction info to JSON
-  const jsonPath = path.join(outputDir, 'tilesets.json');
-  saveJSON(jsonPath, {
-    extractionDate: new Date().toISOString(),
-    totalTilesets: extractedTilesets.length,
-    tilesets: extractedTilesets
-  });
+  const rom = loadROM(romPath);
+  let pokemonNames;
   
-  // Summary
-  console.log(`\nSummary:`);
-  console.log(`  Success: \x1b[32m${progress.successCount}\x1b[0m tilesets`);
-  console.log(`  Errors:  \x1b[31m${progress.errorCount}\x1b[0m tilesets`);
-  console.log(`  Output:  ${tilesetsDir}`);
-  console.log(`  JSON:    ${jsonPath}\n`);
+  // Execute based on command
+  switch (command) {
+    case 'all':
+      console.log('\nExtracting all data...\n');
+      
+      // Extract Pokemon names
+      pokemonNames = extractNames(romPath, outputDir);
+      
+      // Extract front sprites
+      extractPokemonSprites(romPath, outputDir, 'front', pokemonNames);
+      
+      // Extract back sprites
+      extractPokemonSprites(romPath, outputDir, 'back', pokemonNames);
+      
+      // Extract map data (includes tileset graphics)
+      extractMaps(romPath, outputDir);
+      break;
+      
+    case 'pkmn':
+      console.log('\nExtracting Pokemon data...\n');
+      
+      // Extract Pokemon names
+      pokemonNames = extractNames(romPath, outputDir);
+      
+      // Extract front sprites
+      extractPokemonSprites(romPath, outputDir, 'front', pokemonNames);
+      
+      // Extract back sprites
+      extractPokemonSprites(romPath, outputDir, 'back', pokemonNames);
+      break;
+      
+    case 'maps':
+      extractMaps(romPath, outputDir);
+      break;
+      
+    case 'names':
+      extractNames(romPath, outputDir);
+      break;
+  }
   
-  return progress;
+  console.log('\n============================================================');
+  console.log(`Extraction Complete! (Mode: ${command.toUpperCase()})`);
+  console.log('============================================================\n');
 }
 
-// Run extraction
-const romPath = path.join(__dirname, '..', 'rom', 'Pokemon - Red Version (USA, Europe).gb');
-const outputDir = path.join(__dirname, '..', 'output');
-
-// Clear output directory
-console.log('Clearing output directory...');
-clearDirectory(outputDir);
-
-// Extract Pokemon names from ROM
-console.log('Extracting Pokemon names from ROM...\n');
-const rom = loadROM(romPath);
-const pokemonNames = extractPokemonNames(rom);
-
-// Save Pokemon names to JSON
-const namesJsonPath = path.join(outputDir, 'pokemon_names.json');
-saveJSON(namesJsonPath, {
-  extractionDate: new Date().toISOString(),
-  totalNames: pokemonNames.length,
-  names: pokemonNames.map((name, index) => ({
-    internalId: index + 1,
-    name: name
-  }))
-});
-console.log(`Pokemon names saved to: ${namesJsonPath}\n`);
-
-// Extract front sprites
-extractPokemonSprites(romPath, outputDir, 'front', pokemonNames);
-
-// Extract back sprites
-extractPokemonSprites(romPath, outputDir, 'back', pokemonNames);
-
-// Extract tilesets
-extractTilesets(romPath, outputDir);
+// Run main function
+main();
