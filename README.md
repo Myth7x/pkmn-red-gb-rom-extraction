@@ -10,3 +10,6 @@ This project is intended for **research, preservation and educational purposes**
 
 # In Progress
 - Tilesets and Map Data
+
+# Todo
+- Sprite related scripts: Remove hardcodet mew checks
