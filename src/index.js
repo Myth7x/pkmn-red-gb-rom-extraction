@@ -103,10 +103,10 @@ function extractPokemonSprites(romPath, outputDir, spriteType = 'front', pokemon
     
     if (!pokedexNum || pokedexNum === 0) continue;
     
-    // Get Pokemon name using the index number from sprite data
-    // The sprite extractor determines the correct index number for each Pokemon
-    const indexNum = sprite.indexNumber || sprite.internalId || POKEDEX_TO_NAME_INDEX[pokedexNum - 1];
-    const pokemonName = getPokemonNameByInternalId(pokemonNames, indexNum);
+    // Get Pokemon name using Pokedex number to look up the correct name index
+    // The name table is in internal ID order, so we need to map Pokedex → Name Index
+    const nameIndex = POKEDEX_TO_NAME_INDEX[pokedexNum - 1];
+    const pokemonName = getPokemonNameByInternalId(pokemonNames, nameIndex);
     const filename = `${String(pokedexNum).padStart(3, '0')}_${pokemonName}.png`;
     const outputPath = path.join(spritesDir, filename);
     
@@ -125,7 +125,7 @@ function extractPokemonSprites(romPath, outputDir, spriteType = 'front', pokemon
       // Store extraction info
       extractedSprites.push({
         pokedexNumber: pokedexNum,
-        indexNumber: indexNum,
+        indexNumber: sprite.indexNumber, // Internal ID for sprite bank calculation
         name: pokemonName,
         spriteType: spriteType,
         width: imageData.width,
