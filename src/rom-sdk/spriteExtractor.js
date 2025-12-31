@@ -69,14 +69,18 @@ export function extractSpriteData(rom, spriteType = 'front') {
     const bank = getBankRBY(internalId);
     const base = (bank - 1) * 0x4000;
     
+    // Calculate ROM file offsets
+    const frontOffset = base + frontPointer;
+    const backOffset = base + backPointer;
+    
     // Choose front or back based on spriteType parameter
-    const spriteOffset = spriteType === 'back' ? (base + backPointer) : (base + frontPointer);
+    const spriteOffset = spriteType === 'back' ? backOffset : frontOffset;
     
     spritePointers.push({
       pokedexNumber: pokedexNum,
       indexNumber: internalId, // Internal ID for reference
-      frontOffset: base + frontPointer,
-      backOffset: base + backPointer,
+      frontOffset: frontOffset,
+      backOffset: backOffset,
       spriteOffset: spriteOffset, // Current sprite type offset
       size: spriteSize,
       spriteType: spriteType
