@@ -53,9 +53,9 @@ export class MapViewer {
         this.spriteManager = new SpriteManager(this.config);
         
         // State management
-        this.viewportState = new ViewportState();
-        this.mapState = new MapState();
         this.preferences = new PreferencesManager();
+        this.viewportState = new ViewportState();
+        this.mapState = new MapState(); // No longer needs preferences
         
         // UI state
         this.showOverlays = true;
@@ -648,7 +648,7 @@ export class MapViewer {
         }
     }
     
-    handleCanvasClick(e) {
+    async handleCanvasClick(e) {
         const currentMap = this.mapState.getCurrentMap();
         if (!currentMap || !currentMap.objects) return;
         
@@ -711,15 +711,41 @@ export class MapViewer {
                 Logger.log(`Clicked on warp to map ${clickedWarp.mapId}`);
                 
                 if (clickedWarp.mapId === 255) {
-                    // Return to last overworld map
-                    const lastOverworld = this.mapState.getLastOverworldMap();
-                    if (lastOverworld !== null) {
-                        this.loadMap(lastOverworld);
+                    // Return to source overworld map - find it dynamically
+                    Logger.log('Warp 255 detected - finding source overworld map...');
+                    const sourceMap = await this.mapDataManager.findSourceOverworldMap(currentMap.mapId);
+                    if (sourceMap) {
+                        Logger.log(`Returning to map ${sourceMap.mapId} at (${sourceMap.x}, ${sourceMap.y})`);
+                        this.loadMap(sourceMap.mapId);
                     } else {
+                        Logger.warn('No source overworld map found, defaulting to Pallet Town');
                         this.loadMap(0); // Fallback to Pallet Town
                     }
                 } else if (clickedWarp.mapId > 0) {
-                    this.loadMap(clickedWarp.mapId);
+                    // Try to load the target map, but if it fails, find and return to source map
+                    try {
+                        await this.loadMap(clickedWarp.mapId, { suppressErrorUI: true });
+                    } catch (error) {
+                        // Silently handle the error - this is expected for broken maps like elevators
+                        Logger.log(`Map ${clickedWarp.mapId} unavailable, finding source map...`);
+                        
+                        // Get preferred source map from localStorage
+                        const preferredMapId = this.preferences.loadPreviousMap();
+                        
+                        // Find which map(s) have warps to current map
+                        const sourceMap = await this.mapDataManager.findSourceMapsWithWarp(
+                            currentMap.mapId, 
+                            preferredMapId
+                        );
+                        
+                        if (sourceMap) {
+                            Logger.log(`Returning to source map ${sourceMap.mapId} (${sourceMap.mapName})`);
+                            this.loadMap(sourceMap.mapId);
+                        } else {
+                            Logger.warn('No source map found, defaulting to Pallet Town');
+                            this.loadMap(0);
+                        }
+                    }
                 }
                 return;
             }
@@ -764,6 +790,95 @@ export class MapViewer {
         // Update modal title
         modalTitle.innerHTML = '<i class="bi bi-person-circle"></i> NPC Information';
         
+        // Build script text display
+        let scriptTextHTML = '';
+        if (sprite.scriptText) {
+            if (sprite.scriptText.error) {
+                scriptTextHTML = `
+                    <div class="alert alert-warning mt-3 mb-0" role="alert">
+                        <i class="bi bi-exclamation-triangle"></i> <strong>Script Error:</strong> ${sprite.scriptText.error}
+                    </div>
+                `;
+            } else {
+                // Determine alert style based on content type
+                let bgStyle = '#1e4620';
+                let headerColor = '#a3cfbb';
+                let textBg = '#2d2d2d';
+                let textColor = '#e0e0e0';
+                let borderColor = '#3d7d4a';
+                let iconClass = 'bi-chat-square-text';
+                let title = 'Message Text:';
+                
+                if (sprite.scriptText.isSpecialScript) {
+                    bgStyle = '#1a3a52';
+                    headerColor = '#7db3d5';
+                    borderColor = '#2d5f7f';
+                    iconClass = 'bi-code-square';
+                    title = 'Special Script:';
+                } else if (sprite.scriptText.isTrainer) {
+                    bgStyle = '#523a1a';
+                    headerColor = '#d5b37d';
+                    borderColor = '#7f5f2d';
+                    iconClass = 'bi-person-badge';
+                    title = 'Trainer Encounter:';
+                } else if (sprite.scriptText.isInvalidPointer) {
+                    bgStyle = '#2d2d2d';
+                    headerColor = '#999999';
+                    borderColor = '#4d4d4d';
+                    iconClass = 'bi-x-circle';
+                    title = 'Invalid Data:';
+                }
+                
+                // Display decoded text prominently at the top (always show if exists)
+                const decodedTextHTML = sprite.scriptText.decodedText 
+                    ? `
+                        <div class="mt-3 mb-2 border rounded" role="alert" style="background-color: ${bgStyle}; border-color: ${borderColor} !important; border-width: 2px;">
+                            <h6 class="mb-2 p-2" style="color: ${headerColor}; font-weight: bold;"><i class="bi ${iconClass}"></i> ${title}</h6>
+                            <div class="p-3 mx-2 mb-2 border rounded" style="font-family: 'Courier New', monospace; font-size: 1.1em; white-space: pre-wrap; line-height: 1.6; background-color: ${textBg}; color: ${textColor}; border-color: ${borderColor} !important;">
+${sprite.scriptText.decodedText}
+                            </div>
+                        </div>
+                      `
+                    : '';
+                
+                scriptTextHTML = `
+                    ${decodedTextHTML}
+                    <details class="mt-2">
+                        <summary class="btn btn-sm btn-outline-secondary mb-2">
+                            <i class="bi bi-code-square"></i> Show Raw Data & Metadata
+                        </summary>
+                        <div class="alert alert-dark mb-0" role="alert">
+                            ${sprite.scriptText.hexString ? `
+                                <div class="mb-2"><strong><i class="bi bi-file-binary"></i> Hex Bytes:</strong></div>
+                                <div class="font-monospace bg-dark text-light p-2 rounded border" style="font-size: 0.75em; overflow-x: auto; white-space: pre;">
+${sprite.scriptText.hexString}
+                                </div>
+                            ` : '<div class="text-muted"><i class="bi bi-info-circle"></i> No hex data (Special script or trainer)</div>'}
+                            <div class="mt-3 p-2 bg-secondary rounded">
+                                <small>
+                                    <strong><i class="bi bi-info-circle"></i> Metadata:</strong><br>
+                                    Text ID: <span class="badge bg-primary">${sprite.scriptText.textId}</span><br>
+                                    ${sprite.scriptText.isSpecialScript ? `Script Type: <span class="badge bg-info">${sprite.scriptText.scriptType}</span><br>` : ''}
+                                    ${sprite.scriptText.isTrainer ? `Type: <span class="badge bg-warning text-dark">Trainer/Event</span><br>` : ''}
+                                    ${sprite.scriptText.isInvalidPointer ? `Pointer: <span class="badge bg-danger">${sprite.scriptText.textDataPtr}</span> (Invalid)<br>` : ''}
+                                    ${sprite.scriptText.romOffset && sprite.scriptText.romOffset !== 'Unknown' ? `ROM Offset: <code>${sprite.scriptText.romOffset}</code><br>` : ''}
+                                    ${sprite.scriptText.textDataPtr && sprite.scriptText.textDataPtr !== 'Unknown' && !sprite.scriptText.isInvalidPointer ? `Text Pointer: <code>${sprite.scriptText.textDataPtr}</code><br>` : ''}
+                                    ${sprite.scriptText.textPtrTable ? `Text Table: <code>${sprite.scriptText.textPtrTable}</code><br>` : ''}
+                                    Length: <span class="badge bg-secondary">${sprite.scriptText.length || 0} bytes</span>
+                                </small>
+                            </div>
+                        </div>
+                    </details>
+                `;
+            }
+        } else {
+            scriptTextHTML = `
+                <div class="alert alert-secondary mt-3 mb-0" role="alert">
+                    <i class="bi bi-info-circle"></i> <small>No script text available for this NPC.</small>
+                </div>
+            `;
+        }
+        
         modalContent.innerHTML = `
             <div class="npc-info-item">
                 <span class="npc-info-label"><i class="bi bi-geo-alt"></i> Position (ROM):</span>
@@ -796,9 +911,7 @@ export class MapViewer {
                 <span class="npc-info-label"><i class="bi bi-chat-left-text"></i> Text/Script ID:</span>
                 <span class="npc-info-value badge bg-success">${sprite.textId}</span>
             </div>
-            <div class="alert alert-info mt-2 mb-0" role="alert">
-                <i class="bi bi-lightbulb"></i> <small>Script text extraction requires parsing text banks from ROM. Future feature.</small>
-            </div>
+            ${scriptTextHTML}
         `;
         
         // Show the modal
@@ -818,6 +931,88 @@ export class MapViewer {
         // Update modal title
         modalTitle.innerHTML = '<i class="bi bi-sign-stop"></i> Sign Information';
         
+        // Build script text display
+        let scriptTextHTML = '';
+        if (sign.scriptText) {
+            if (sign.scriptText.error) {
+                scriptTextHTML = `
+                    <div class="alert alert-warning mt-3 mb-0" role="alert">
+                        <i class="bi bi-exclamation-triangle"></i> <strong>Script Error:</strong> ${sign.scriptText.error}
+                    </div>
+                `;
+            } else {
+                // Determine alert style based on content type
+                let bgStyle = '#1e4620';
+                let headerColor = '#a3cfbb';
+                let textBg = '#2d2d2d';
+                let textColor = '#e0e0e0';
+                let borderColor = '#3d7d4a';
+                let iconClass = 'bi-chat-square-text';
+                let title = 'Sign Text:';
+                
+                if (sign.scriptText.isSpecialScript) {
+                    bgStyle = '#1a3a52';
+                    headerColor = '#7db3d5';
+                    borderColor = '#2d5f7f';
+                    iconClass = 'bi-code-square';
+                    title = 'Special Script:';
+                } else if (sign.scriptText.isInvalidPointer) {
+                    bgStyle = '#2d2d2d';
+                    headerColor = '#999999';
+                    borderColor = '#4d4d4d';
+                    iconClass = 'bi-x-circle';
+                    title = 'Invalid Data:';
+                }
+                
+                // Display decoded text prominently at the top (always show if exists)
+                const decodedTextHTML = sign.scriptText.decodedText 
+                    ? `
+                        <div class="mt-3 mb-2 border rounded" role="alert" style="background-color: ${bgStyle}; border-color: ${borderColor} !important; border-width: 2px;">
+                            <h6 class="mb-2 p-2" style="color: ${headerColor}; font-weight: bold;"><i class="bi ${iconClass}"></i> ${title}</h6>
+                            <div class="p-3 mx-2 mb-2 border rounded" style="font-family: 'Courier New', monospace; font-size: 1.1em; white-space: pre-wrap; line-height: 1.6; background-color: ${textBg}; color: ${textColor}; border-color: ${borderColor} !important;">
+${sign.scriptText.decodedText}
+                            </div>
+                        </div>
+                      `
+                    : '';
+                
+                scriptTextHTML = `
+                    ${decodedTextHTML}
+                    <details class="mt-2">
+                        <summary class="btn btn-sm btn-outline-secondary mb-2">
+                            <i class="bi bi-code-square"></i> Show Raw Data & Metadata
+                        </summary>
+                        <div class="alert alert-dark mb-0" role="alert">
+                            ${sign.scriptText.hexString ? `
+                                <div class="mb-2"><strong><i class="bi bi-file-binary"></i> Hex Bytes:</strong></div>
+                                <div class="font-monospace bg-dark text-light p-2 rounded border" style="font-size: 0.75em; overflow-x: auto; white-space: pre;">
+${sign.scriptText.hexString}
+                                </div>
+                            ` : '<div class="text-muted"><i class="bi bi-info-circle"></i> No hex data (Special script)</div>'}
+                            <div class="mt-3 p-2 bg-secondary rounded">
+                                <small>
+                                    <strong><i class="bi bi-info-circle"></i> Metadata:</strong><br>
+                                    Text ID: <span class="badge bg-primary">${sign.scriptText.textId}</span><br>
+                                    ${sign.scriptText.isSpecialScript ? `Script Type: <span class="badge bg-info">${sign.scriptText.scriptType}</span><br>` : ''}
+                                    ${sign.scriptText.isInvalidPointer ? `Pointer: <span class="badge bg-danger">${sign.scriptText.textDataPtr}</span> (Invalid)<br>` : ''}
+                                    ${sign.scriptText.romOffset && sign.scriptText.romOffset !== 'Unknown' ? `ROM Offset: <code>${sign.scriptText.romOffset}</code><br>` : ''}
+                                    ${sign.scriptText.textDataPtr && sign.scriptText.textDataPtr !== 'Unknown' && !sign.scriptText.isInvalidPointer ? `Text Pointer: <code>${sign.scriptText.textDataPtr}</code><br>` : ''}
+                                    ${sign.scriptText.textPtrTable ? `Text Table: <code>${sign.scriptText.textPtrTable}</code><br>` : ''}
+                                    Length: <span class="badge bg-secondary">${sign.scriptText.length || 0} bytes</span>
+                                </small>
+                            </div>
+                        </div>
+                    </details>
+                `;
+            }
+        } else {
+            scriptTextHTML = `
+                <div class="alert alert-secondary mt-3 mb-0" role="alert">
+                    <i class="bi bi-info-circle"></i> <small>No script text available for this sign.</small>
+                </div>
+            `;
+        }
+        
         modalContent.innerHTML = `
             <div class="npc-info-item">
                 <span class="npc-info-label"><i class="bi bi-geo-alt"></i> Position (ROM):</span>
@@ -831,9 +1026,7 @@ export class MapViewer {
                 <span class="npc-info-label"><i class="bi bi-chat-left-text"></i> Text ID:</span>
                 <span class="npc-info-value badge bg-success">${sign.textId}</span>
             </div>
-            <div class="alert alert-info mt-3 mb-0" role="alert">
-                <i class="bi bi-info-circle"></i> <small>Text content not yet available.</small>
-            </div>
+            ${scriptTextHTML}
         `;
         
         // Show the modal
@@ -1199,7 +1392,9 @@ export class MapViewer {
         container.appendChild(section);
     }
     
-    async loadMap(mapId) {
+    async loadMap(mapId, options = {}) {
+        const { suppressErrorUI = false } = options;
+        
         try {
             const mapData = await this.mapDataManager.loadMap(mapId);
             
@@ -1226,19 +1421,9 @@ export class MapViewer {
             this.mapState.setCurrentMap(mapData);
             this.preferences.saveCurrentMap(mapId);
             
-            // Track last overworld map (maps with connections are overworld maps)
-            const hasConnections = mapData.connections && (
-                mapData.connections.north || 
-                mapData.connections.south || 
-                mapData.connections.east || 
-                mapData.connections.west
-            );
-            
-            if (hasConnections) {
-                this.mapState.setLastOverworldMap(mapData.mapId);
-                Logger.log(`Overworld map detected: ${mapData.mapId} (${mapData.name})`);
-            } else {
-                Logger.log(`Indoor/interior map: ${mapData.mapId} (${mapData.name})`);
+            // Save previous map ID to localStorage
+            if (this.mapState.previousMapId !== null) {
+                this.preferences.savePreviousMap(this.mapState.previousMapId);
             }
             
             // Update UI
@@ -1254,7 +1439,13 @@ export class MapViewer {
             Logger.success(`Map ${mapId} loaded and rendered successfully`);
             
         } catch (error) {
-            this.errorHandler.handle(error, `Loading map ${mapId}`);
+            // Only show error UI if not suppressed
+            if (!suppressErrorUI) {
+                this.errorHandler.handle(error, `Loading map ${mapId}`);
+            } else {
+                Logger.log(`Map ${mapId} failed to load: ${error.message}`);
+            }
+            throw error; // Rethrow so caller can handle it
         }
     }
     

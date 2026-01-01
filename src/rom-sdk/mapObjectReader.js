@@ -77,21 +77,42 @@ export function readMapObjects(rom, mapHeader, bank) {
     const y = rom[offset++];
     const x = rom[offset++];
     const movement = rom[offset++];
-    const textIdLow = rom[offset++];
-    const textIdHigh = rom[offset++];
+    const range = rom[offset++];  // range/direction byte
+    const textIdByte = rom[offset++];
+    
+    // Check if this is a trainer or item
+    const TRAINER_FLAG = 0x40;
+    const ITEM_FLAG = 0x80;
+    
+    let textId = textIdByte;
+    let trainerClass = null;
+    let trainerNumber = null;
+    let itemId = null;
+    let type = 'npc';
+    
+    if (textIdByte & TRAINER_FLAG) {
+      // This is a trainer
+      type = 'trainer';
+      textId = textIdByte & ~TRAINER_FLAG;  // Remove trainer flag
+      trainerClass = rom[offset++];
+      trainerNumber = rom[offset++];
+    } else if (textIdByte & ITEM_FLAG) {
+      // This is an item
+      type = 'item';
+      textId = textIdByte & ~ITEM_FLAG;  // Remove item flag
+      itemId = rom[offset++];
+    }
     
     sprites.push({
       pictureId,
-      y,
-      x,
+      y: y - 4,  // Y is stored as Y+4
+      x: x - 4,  // X is stored as X+4
       movement,
-      textId: (textIdHigh << 8) | textIdLow,
-      // Movement byte meanings:
-      // 0xFF = Trainer
-      // 0xFE = Item ball
-      // Other = NPC with movement pattern
-      type: movement === 0xFF ? 'trainer' : 
-            movement === 0xFE ? 'item' : 'npc'
+      range,
+      textId,
+      type,
+      ...(trainerClass !== null && { trainerClass, trainerNumber }),
+      ...(itemId !== null && { itemId })
     });
   }
 

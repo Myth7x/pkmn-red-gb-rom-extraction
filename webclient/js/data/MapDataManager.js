@@ -95,4 +95,118 @@ export class MapDataManager {
     getMapFromCache(mapId) {
         return this.cache.get(mapId);
     }
+    
+    /**
+     * Find which overworld map has a warp leading to the specified indoor map
+     * Used for handling warp 255 (return to previous map)
+     * @param {number} indoorMapId - The indoor map ID to find the source for
+     * @returns {Promise<{mapId: number, x: number, y: number}|null>} Source map info or null
+     */
+    async findSourceOverworldMap(indoorMapId) {
+        if (!this.mapIndex) {
+            await this.loadMapIndex();
+        }
+        
+        Logger.log(`Finding source overworld map for indoor map ${indoorMapId}...`);
+        
+        // Search through all maps to find one with a warp leading to this indoor map
+        for (const mapInfo of this.mapIndex.maps) {
+            try {
+                const mapData = await this.loadMap(mapInfo.mapId);
+                
+                // Check if this map has connections (it's an overworld map)
+                const hasConnections = mapData.connections && (
+                    mapData.connections.north || 
+                    mapData.connections.south || 
+                    mapData.connections.east || 
+                    mapData.connections.west
+                );
+                
+                if (!hasConnections) {
+                    continue; // Skip indoor maps
+                }
+                
+                // Check if this overworld map has a warp to our indoor map
+                if (mapData.objects?.warps?.data) {
+                    const warpToIndoor = mapData.objects.warps.data.find(w => w.mapId === indoorMapId);
+                    if (warpToIndoor) {
+                        Logger.success(`Found source: Map ${mapInfo.mapId} (${mapInfo.name}) at (${warpToIndoor.x}, ${warpToIndoor.y})`);
+                        return {
+                            mapId: mapInfo.mapId,
+                            x: warpToIndoor.x,
+                            y: warpToIndoor.y
+                        };
+                    }
+                }
+            } catch (error) {
+                // Skip maps that fail to load
+                Logger.warn(`Failed to check map ${mapInfo.mapId}:`, error.message);
+                continue;
+            }
+        }
+        
+        Logger.warn(`No source overworld map found for indoor map ${indoorMapId}`);
+        return null;
+    }
+    
+    /**
+     * Find all maps that have warps leading to the specified target map
+     * @param {number} targetMapId - The target map ID to find sources for
+     * @param {number|null} preferredMapId - Preferred source map ID (e.g., from history)
+     * @returns {Promise<{mapId: number, x: number, y: number}|null>} Source map info or null
+     */
+    async findSourceMapsWithWarp(targetMapId, preferredMapId = null) {
+        if (!this.mapIndex) {
+            await this.loadMapIndex();
+        }
+        
+        Logger.log(`Finding source maps with warps to map ${targetMapId}...`);
+        const sourceMaps = [];
+        
+        // Search through all maps to find ones with warps leading to target map
+        for (const mapInfo of this.mapIndex.maps) {
+            try {
+                const mapData = await this.loadMap(mapInfo.mapId);
+                
+                // Check if this map has a warp to our target map
+                if (mapData.objects?.warps?.data) {
+                    const warpsToTarget = mapData.objects.warps.data.filter(w => w.mapId === targetMapId);
+                    if (warpsToTarget.length > 0) {
+                        // Add all warps from this map to the target
+                        for (const warp of warpsToTarget) {
+                            sourceMaps.push({
+                                mapId: mapInfo.mapId,
+                                mapName: mapInfo.name,
+                                x: warp.x,
+                                y: warp.y,
+                                warpId: warp.warpId
+                            });
+                        }
+                    }
+                }
+            } catch (error) {
+                // Skip maps that fail to load
+                continue;
+            }
+        }
+        
+        Logger.log(`Found ${sourceMaps.length} source map(s) with warps to map ${targetMapId}`);
+        
+        if (sourceMaps.length === 0) {
+            return null;
+        }
+        
+        // If we have a preferred map ID and it's in the list, return that one
+        if (preferredMapId !== null) {
+            const preferred = sourceMaps.find(m => m.mapId === preferredMapId);
+            if (preferred) {
+                Logger.success(`Using preferred source map ${preferred.mapId} (${preferred.mapName})`);
+                return preferred;
+            }
+        }
+        
+        // Otherwise return the first one found
+        Logger.log(`Using first source map ${sourceMaps[0].mapId} (${sourceMaps[0].mapName})`);
+        return sourceMaps[0];
+    }
 }

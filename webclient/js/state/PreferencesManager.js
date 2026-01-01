@@ -58,6 +58,32 @@ export class PreferencesManager {
         return mapId;
     }
     
+    // Previous map preferences (for elevator/warp returns)
+    savePreviousMap(mapId) {
+        this.save(STORAGE_KEYS.PREVIOUS_MAP, mapId);
+    }
+    
+    loadPreviousMap() {
+        return this.loadNumber(STORAGE_KEYS.PREVIOUS_MAP, null);
+    }
+    
+    // Last overworld map (for warp 255 handling)
+    saveLastOverworldMap(mapId, x = null, y = null) {
+        this.save(STORAGE_KEYS.LAST_OVERWORLD_MAP, mapId);
+        if (x !== null && y !== null) {
+            this.save(STORAGE_KEYS.LAST_OVERWORLD_X, x);
+            this.save(STORAGE_KEYS.LAST_OVERWORLD_Y, y);
+        }
+        Logger.log(`Saved last overworld map: ${mapId} (${x}, ${y})`);
+    }
+    
+    loadLastOverworldMap() {
+        const mapId = this.loadNumber(STORAGE_KEYS.LAST_OVERWORLD_MAP, null);
+        const x = this.loadNumber(STORAGE_KEYS.LAST_OVERWORLD_X, null);
+        const y = this.loadNumber(STORAGE_KEYS.LAST_OVERWORLD_Y, null);
+        return { mapId, x, y };
+    }
+    
     // Overlay preferences
     saveOverlaySettings(showOverlays, showGrid, showCoordLabels) {
         this.save(STORAGE_KEYS.SHOW_OVERLAYS, showOverlays);

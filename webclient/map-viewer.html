@@ -483,10 +483,68 @@
                 window.toggleCoordLabels = () => viewer.toggleCoordLabels();
                 window.toggleSidebar = () => viewer.toggleSidebar();
                 
+                // Start memory and cache monitoring
+                startMemoryMonitor();
+                
             } catch (error) {
                 console.error('❌ Fatal error initializing Map Viewer:', error);
                 alert('Failed to initialize Map Viewer: ' + error.message);
             }
+        }
+        
+        // Memory and cache monitoring
+        function startMemoryMonitor() {
+            function updateTitle() {
+                let memoryInfo = '';
+                let cacheInfo = '';
+                
+                // Get memory usage if available (Chrome/Edge)
+                if (performance.memory) {
+                    const usedMB = (performance.memory.usedJSHeapSize / 1024 / 1024).toFixed(1);
+                    const totalMB = (performance.memory.jsHeapSizeLimit / 1024 / 1024).toFixed(1);
+                    const usedPercent = ((performance.memory.usedJSHeapSize / performance.memory.jsHeapSizeLimit) * 100).toFixed(0);
+                    memoryInfo = `Mem: ${usedMB}/${totalMB}MB (${usedPercent}%)`;
+                }
+                
+                // Estimate cache usage from loaded resources
+                if (window.mapViewer) {
+                    const spriteCount = Object.keys(window.mapViewer.spriteManager?.spriteImages || {}).length;
+                    const tilesetCount = Object.keys(window.mapViewer.tilesetManager?.tilesetImages || {}).length;
+                    const blockDefCount = Object.keys(window.mapViewer.tilesetManager?.tilesetBlockDefinitions || {}).length;
+                    const mapCount = window.mapViewer.mapData ? 1 : 0;
+                    
+                    // Calculate approximate cache size in MB
+                    let cacheSizeBytes = 0;
+                    
+                    // Sprites: ~48x16 RGBA = ~3KB per sprite
+                    cacheSizeBytes += spriteCount * 48 * 16 * 4;
+                    
+                    // Tilesets: ~128x128 RGBA = ~65KB per tileset
+                    cacheSizeBytes += tilesetCount * 128 * 128 * 4;
+                    
+                    // Block definitions: estimate ~256 blocks * 16 bytes each = ~4KB per tileset
+                    cacheSizeBytes += blockDefCount * 256 * 16;
+                    
+                    // Map data: estimate ~10KB per map
+                    cacheSizeBytes += mapCount * 10 * 1024;
+                    
+                    const cacheSizeMB = (cacheSizeBytes / 1024 / 1024).toFixed(2);
+                    cacheInfo = `Cache: ${cacheSizeMB}MB (${spriteCount}S | ${tilesetCount}T | ${blockDefCount}B | ${mapCount}M)`;
+                }
+                
+                // Build title - cache first, then memory
+                const parts = [];
+                if (cacheInfo) parts.push(cacheInfo);
+                if (memoryInfo) parts.push(memoryInfo);
+                
+                document.title = parts.length > 0 ? parts.join(' | ') : 'Map Viewer';
+            }
+            
+            // Update immediately
+            updateTitle();
+            
+            // Update every 2 seconds
+            setInterval(updateTitle, 2000);
         }
     </script>
 </body>

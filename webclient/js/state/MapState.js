@@ -7,7 +7,6 @@ export class MapState {
     constructor() {
         this.currentMap = null;
         this.previousMapId = null;
-        this.lastOverworldMapId = null;
         this.navigationHistory = [];
     }
     
@@ -19,19 +18,6 @@ export class MapState {
         }
         
         this.currentMap = mapData;
-        
-        // Track last overworld map (maps with connections)
-        const hasConnections = mapData.connections && (
-            mapData.connections.north || 
-            mapData.connections.south || 
-            mapData.connections.east || 
-            mapData.connections.west
-        );
-        
-        if (hasConnections) {
-            this.lastOverworldMapId = mapData.mapId;
-            Logger.log(`Overworld map detected: ${mapData.mapId} (${mapData.name})`);
-        }
         
         // Add to history
         this.pushHistory(mapData.mapId);
@@ -67,13 +53,5 @@ export class MapState {
             return this.navigationHistory[this.navigationHistory.length - 2];
         }
         return null;
-    }
-    
-    getLastOverworldMap() {
-        return this.lastOverworldMapId;
-    }
-    
-    setLastOverworldMap(mapId) {
-        this.lastOverworldMapId = mapId;
     }
 }

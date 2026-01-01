@@ -79,9 +79,13 @@ export const GRID_COLOR = 'rgba(255, 255, 255, 0.15)';
 export const STORAGE_KEYS = {
     ZOOM: 'mapViewerZoom',
     CURRENT_MAP: 'mapViewerCurrentMap',
+    PREVIOUS_MAP: 'mapViewerPreviousMap',
     SHOW_OVERLAYS: 'mapViewerShowOverlays',
     SHOW_GRID: 'mapViewerShowGrid',
     SHOW_COORD_LABELS: 'mapViewerShowCoordLabels',
     SHOW_TOOLTIP: 'mapViewerShowTooltip',
-    SIDEBAR_HIDDEN: 'mapViewerSidebarHidden'
+    SIDEBAR_HIDDEN: 'mapViewerSidebarHidden',
+    LAST_OVERWORLD_MAP: 'mapViewerLastOverworldMap',
+    LAST_OVERWORLD_X: 'mapViewerLastOverworldX',
+    LAST_OVERWORLD_Y: 'mapViewerLastOverworldY'
 };
