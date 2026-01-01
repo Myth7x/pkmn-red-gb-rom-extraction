@@ -1,8 +1,12 @@
 /**
- * Tileset Block Reader for Pokemon Red/Blue
+ * Tileset Block Reader for Pokemon Red/Blue - CORRECT IMPLEMENTATION
  * 
- * Reads tileset block data (4x4 tile metatiles) and collision data.
- * Blocks are the building blocks of maps - each block is a 4x4 arrangement of 8x8 tiles.
+ * Based on analysis of pret/pokered disassembly.
+ * 
+ * KEY INSIGHT: Collision is TILE-BASED, not block-based!
+ * - Each tileset has a list of IMPASSABLE TILE IDs
+ * - Blocks are just 4x4 arrangements of tiles for visual organization
+ * - Collision is determined by checking if a tile ID is in the impassable list
  */
 
 import { TILESET_NAMES } from './mapConstants.js';
@@ -13,14 +17,14 @@ const TILESET_HEADER_OFFSETS = {
   BANK: 0,           // 1 byte - ROM bank containing tileset graphics
   BLOCK_PTR: 1,      // 2 bytes - Pointer to block data
   GFX_PTR: 3,        // 2 bytes - Pointer to graphics data
-  COLL_PTR: 5,       // 2 bytes - Pointer to collision data
-  COUNTER_TILES: 7,  // 3 bytes - Counter tiles (for animated tiles)
+  COLL_PTR: 5,       // 2 bytes - Pointer to collision data (LIST OF IMPASSABLE TILE IDs!)
+  COUNTER_TILES: 7,  // 3 bytes - Counter tiles (for talking over)
   GRASS_TILE: 10,    // 1 byte - Grass tile ID
   ANIM: 11           // 1 byte - Animation type
 };
 
-// Known offset for tileset headers table
-const TILESET_HEADERS_OFFSET = 0xC7BE; // Tilesets table in Pokemon Red
+// Known offset for tileset headers table in Pokemon Red
+const TILESET_HEADERS_OFFSET = 0xC7BE;
 
 /**
  * Convert bank + pointer to ROM offset
@@ -83,42 +87,139 @@ function getAnimationName(anim) {
 
 /**
  * Read block data for a tileset
- * A block is 4x4 tiles = 16 bytes
+ * Each block is 4x4 tiles = 16 bytes
  * Blocks define how tiles are arranged to form larger structures
  * 
  * @param {Buffer} rom - ROM buffer
  * @param {Object} tilesetHeader - Tileset header object
  * @param {number} numBlocks - Number of blocks to read (default 256)
- * @returns {Array<Uint8Array>} - Array of blocks, each is 16 bytes (4x4 tiles)
+ * @returns {Array<Object>} - Array of blocks with tile IDs
  */
 export function readTilesetBlocks(rom, tilesetHeader, numBlocks = 256) {
   const blockPtr = parseInt(tilesetHeader.blockPtr, 16);
   const offset = bankPointerToOffset(tilesetHeader.bank, blockPtr);
   
   const blocks = [];
-  for (let i = 0; i < numBlocks; i++) {
-    const blockOffset = offset + (i * 16);
+  for (let blockId = 0; blockId < numBlocks; blockId++) {
+    const blockOffset = offset + (blockId * 16);
     const blockData = rom.slice(blockOffset, blockOffset + 16);
-    blocks.push(blockData);
+    
+    // Parse block into 4x4 tile IDs
+    const tiles = [];
+    for (let row = 0; row < 4; row++) {
+      const rowTiles = [];
+      for (let col = 0; col < 4; col++) {
+        const tileId = blockData[row * 4 + col];
+        rowTiles.push(tileId);
+      }
+      tiles.push(rowTiles);
+    }
+    
+    blocks.push({
+      blockId,
+      tiles, // 4x4 array of tile IDs
+      rawData: Array.from(blockData) // Raw 16 bytes for debugging
+    });
   }
   
   return blocks;
 }
 
 /**
- * Read collision data for a tileset
- * Each tile has collision properties (walkable, surfable, etc.)
+ * Read collision data for a tileset (CORRECT METHOD)
+ * 
+ * The collision data is a LIST OF TILE IDs that are impassable,
+ * terminated by 0xFF.
+ * 
+ * This is NOT 256 bytes of collision values! It's a variable-length list!
  * 
  * @param {Buffer} rom - ROM buffer
  * @param {Object} tilesetHeader - Tileset header object
- * @param {number} numTiles - Number of tiles to read collision for (default 256)
- * @returns {Uint8Array} - Collision data
+ * @returns {Array<number>} - Array of impassable tile IDs
  */
-export function readTilesetCollision(rom, tilesetHeader, numTiles = 256) {
+export function readTilesetCollision(rom, tilesetHeader) {
   const collPtr = parseInt(tilesetHeader.collPtr, 16);
   const offset = bankPointerToOffset(tilesetHeader.bank, collPtr);
   
-  return rom.slice(offset, offset + numTiles);
+  const impassableTiles = [];
+  let i = 0;
+  
+  // Read tile IDs until we hit 0xFF (end marker)
+  while (true) {
+    const tileId = rom[offset + i];
+    if (tileId === 0xFF) {
+      break; // End of list
+    }
+    impassableTiles.push(tileId);
+    i++;
+    
+    // Safety check to prevent infinite loops
+    if (i > 256) {
+      console.warn(`[WARNING] Collision list for tileset ${tilesetHeader.name} is suspiciously long (>256 entries)`);
+      break;
+    }
+  }
+  
+  return impassableTiles;
+}
+
+/**
+ * Check if a tile ID is passable
+ * @param {number} tileId - Tile ID to check
+ * @param {Array<number>} impassableTiles - List of impassable tile IDs
+ * @returns {boolean} - True if passable, false if impassable
+ */
+export function isTilePassable(tileId, impassableTiles) {
+  return !impassableTiles.includes(tileId);
+}
+
+/**
+ * Get tile collision properties
+ * @param {number} tileId - Tile ID
+ * @param {Object} tileset - Tileset data with impassableTiles, grassTile, etc.
+ * @returns {Object} - Collision properties
+ */
+export function getTileCollisionInfo(tileId, tileset) {
+  const walkable = !tileset.impassableTiles.includes(tileId);
+  
+  // Determine tile type
+  let type = 'PASSABLE';
+  let surfable = false;
+  let description = 'Passable ground';
+  
+  if (!walkable) {
+    type = 'WALL';
+    description = 'Impassable tile';
+  }
+  
+  // Check for grass
+  if (tileId === tileset.grassTile) {
+    type = 'GRASS';
+    description = 'Tall grass (encounters)';
+  }
+  
+  // Check for water tiles (common water tile IDs)
+  const waterTiles = [0x14, 0x32, 0x48];
+  if (waterTiles.includes(tileId)) {
+    type = 'WATER';
+    surfable = tileId === 0x14 || tileId === 0x48; // Some water is surfable
+    description = surfable ? 'Water (surfable)' : 'Water (not surfable)';
+  }
+  
+  // Check for ledge tiles (based on pret/pokered LedgeTiles data)
+  const ledgeTiles = [0x27, 0x0D, 0x1D, 0x36, 0x37];
+  if (ledgeTiles.includes(tileId)) {
+    type = 'LEDGE';
+    description = 'Ledge tile';
+  }
+  
+  return {
+    tileId,
+    type,
+    walkable,
+    surfable,
+    description
+  };
 }
 
 /**
@@ -162,77 +263,6 @@ export function decode2bppTile(tileData) {
 }
 
 /**
- * Get collision type name
- * @param {number} collision - Collision byte
- * @returns {string} - Collision type description
- */
-/**
- * Get collision type from collision value
- * Based on Pokemon Red/Blue collision system
- * 
- * @param {number} collision - Collision byte value
- * @returns {Object} - Collision type info
- */
-export function getCollisionType(collision) {
-  // Collision type mapping based on Pokemon Red disassembly
-  const types = {
-    // Movement permissions
-    0x00: { type: 'PASSABLE', walkable: true, surfable: false, description: 'Normal walkable ground' },
-    0x01: { type: 'WALL', walkable: false, surfable: false, description: 'Solid wall' },
-    0x0C: { type: 'DOOR', walkable: false, surfable: false, description: 'Door tile' },
-    0x0D: { type: 'DOOR_2', walkable: false, surfable: false, description: 'Door tile variant' },
-    0x0F: { type: 'BLOCK', walkable: false, surfable: false, description: 'Blocking tile' },
-    
-    // Water tiles
-    0x14: { type: 'WATER', walkable: false, surfable: true, description: 'Water (surfable)' },
-    0x32: { type: 'WATER_BLOCK', walkable: false, surfable: false, description: 'Impassable water' },
-    
-    // Grass and special tiles
-    0x15: { type: 'GRASS', walkable: true, surfable: false, description: 'Tall grass (encounters)' },
-    0x52: { type: 'GRASS_2', walkable: true, surfable: false, description: 'Grass variant' },
-    
-    // Warp tiles
-    0x20: { type: 'WARP', walkable: true, surfable: false, description: 'Warp tile' },
-    0x60: { type: 'WARP_PAD', walkable: true, surfable: false, description: 'Warp pad' },
-    
-    // Ledges (one-way)
-    0x16: { type: 'LEDGE_DOWN', walkable: true, surfable: false, description: 'Ledge (jump down)' },
-    0x17: { type: 'LEDGE_RIGHT', walkable: true, surfable: false, description: 'Ledge (jump right)' },
-    0x18: { type: 'LEDGE_LEFT', walkable: true, surfable: false, description: 'Ledge (jump left)' },
-    
-    // Counter tiles (can talk over)
-    0x50: { type: 'COUNTER', walkable: false, surfable: false, description: 'Counter (can talk over)' },
-    
-    // Special movement
-    0x3C: { type: 'DOOR_WARP', walkable: false, surfable: false, description: 'Door with warp' },
-    0x3D: { type: 'WARP_DOWN', walkable: true, surfable: false, description: 'Downward warp' },
-    
-    // Unknown/Wall types
-    0x10: { type: 'WALL_10', walkable: false, surfable: false, description: 'Wall variant' },
-    0x11: { type: 'WALL_11', walkable: false, surfable: false, description: 'Wall variant' },
-    0x1B: { type: 'WALL_1B', walkable: false, surfable: false, description: 'Wall variant' },
-    0x21: { type: 'WALL_21', walkable: false, surfable: false, description: 'Wall variant' }
-  };
-
-  // Return known type or classify as wall/unknown
-  if (types[collision]) {
-    return types[collision];
-  }
-  
-  // Classify unknown values
-  if (collision >= 0x01 && collision <= 0x0F) {
-    return { type: 'WALL', walkable: false, surfable: false, description: `Wall type 0x${collision.toString(16).toUpperCase()}` };
-  }
-  
-  return { 
-    type: 'UNKNOWN', 
-    walkable: false, 
-    surfable: false, 
-    description: `Unknown collision 0x${collision.toString(16).toUpperCase()}` 
-  };
-}
-
-/**
  * Read all tileset headers
  * @param {Buffer} rom - ROM buffer
  * @param {number} numTilesets - Number of tilesets (default 24)
@@ -249,4 +279,27 @@ export function readAllTilesetHeaders(rom, numTilesets = 24) {
     }
   }
   return headers;
+}
+
+/**
+ * Read complete tileset data (header + blocks + collision + graphics)
+ * @param {Buffer} rom - ROM buffer
+ * @param {number} tilesetId - Tileset ID
+ * @returns {Object} - Complete tileset data
+ */
+export function readCompleteTileset(rom, tilesetId) {
+  const header = readTilesetHeader(rom, tilesetId);
+  const blocks = readTilesetBlocks(rom, header);
+  const impassableTiles = readTilesetCollision(rom, header);
+  const graphics = readTilesetGraphics(rom, header);
+  
+  return {
+    ...header,
+    blocks,
+    impassableTiles,
+    graphicsData: graphics,
+    // Helper data
+    numBlocks: blocks.length,
+    numImpassableTiles: impassableTiles.length
+  };
 }

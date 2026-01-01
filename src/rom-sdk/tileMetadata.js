@@ -9,7 +9,7 @@
  * - Ledges and special tiles
  */
 
-import { getCollisionType } from './tilesetBlockReader.js';
+import { getTileCollisionInfo, isTilePassable } from './tilesetBlockReader.js';
 
 /**
  * Analyze tile metadata for a map
@@ -37,48 +37,60 @@ export function analyzeTileMetadata(mapData, tilesetData) {
 
   // Get collision data for the tileset
   const tileset = tilesetData.tilesets.find(t => t.tilesetId === mapData.tileset);
-  if (!tileset || !tileset.collision) {
+  if (!tileset || !tileset.impassableTiles || !tileset.blocks) {
     return analysis;
   }
 
-  // Analyze each tile in the map
+  // Analyze each block in the map
+  // Note: Each block is 4x4 tiles, so we analyze at block level for now
   for (let i = 0; i < mapData.blockData.length; i++) {
     const blockId = mapData.blockData[i];
-    const collision = tileset.collision.find(c => c.tileId === blockId);
+    const block = tileset.blocks[blockId];
     
-    if (!collision) continue;
+    if (!block) continue;
 
     const x = i % mapData.width;
     const y = Math.floor(i / mapData.width);
-    const tileInfo = {
-      index: i,
-      x: x,
-      y: y,
-      blockId: blockId,
-      collisionValue: collision.value,
-      collisionType: collision.type
-    };
+    
+    // Analyze the tiles within this block (4x4)
+    for (let tileRow = 0; tileRow < 4; tileRow++) {
+      for (let tileCol = 0; tileCol < 4; tileCol++) {
+        const tileId = block.tiles[tileRow][tileCol];
+        const tileInfo = getTileCollisionInfo(tileId, tileset);
+        
+        const tileData = {
+          index: i,
+          blockX: x,
+          blockY: y,
+          tileRow: tileRow,
+          tileCol: tileCol,
+          blockId: blockId,
+          tileId: tileId,
+          collisionType: tileInfo.type
+        };
 
-    // Categorize tile
-    const typeKey = collision.type;
-    if (!analysis.tilesByType[typeKey]) {
-      analysis.tilesByType[typeKey] = 0;
-    }
-    analysis.tilesByType[typeKey]++;
+        // Categorize tile
+        const typeKey = tileInfo.type;
+        if (!analysis.tilesByType[typeKey]) {
+          analysis.tilesByType[typeKey] = 0;
+        }
+        analysis.tilesByType[typeKey]++;
 
-    // Add to specific lists
-    if (typeKey.includes('GRASS')) {
-      analysis.grassTiles.push(tileInfo);
-    } else if (typeKey.includes('WARP')) {
-      analysis.warpTiles.push(tileInfo);
-    } else if (typeKey.includes('WATER') && !typeKey.includes('BLOCK')) {
-      analysis.waterTiles.push(tileInfo);
-    } else if (typeKey.includes('LEDGE')) {
-      analysis.ledgeTiles.push(tileInfo);
-    } else if (typeKey.includes('WALL') || typeKey === 'WALL') {
-      analysis.wallTiles.push(tileInfo);
-    } else if (typeKey === 'PASSABLE') {
-      analysis.passableTiles.push(tileInfo);
+        // Add to specific lists
+        if (typeKey.includes('GRASS')) {
+          analysis.grassTiles.push(tileData);
+        } else if (typeKey.includes('WARP')) {
+          analysis.warpTiles.push(tileData);
+        } else if (typeKey.includes('WATER') && !typeKey.includes('BLOCK')) {
+          analysis.waterTiles.push(tileData);
+        } else if (typeKey.includes('LEDGE')) {
+          analysis.ledgeTiles.push(tileData);
+        } else if (typeKey.includes('WALL') || typeKey === 'WALL') {
+          analysis.wallTiles.push(tileData);
+        } else if (typeKey === 'PASSABLE') {
+          analysis.passableTiles.push(tileData);
+        }
+      }
     }
   }
 
@@ -235,11 +247,11 @@ export function generateMetadataSummary(metadata) {
 
 /**
  * Check if a specific tile is walkable
- * @param {number} x - Tile X coordinate
- * @param {number} y - Tile Y coordinate
+ * @param {number} x - Block X coordinate
+ * @param {number} y - Block Y coordinate
  * @param {Object} mapData - Map data
  * @param {Object} tilesetData - Tileset data
- * @returns {boolean} - True if walkable
+ * @returns {boolean} - True if walkable (checks if ANY tile in block is walkable)
  */
 export function isTileWalkable(x, y, mapData, tilesetData) {
   if (x < 0 || y < 0 || x >= mapData.width || y >= mapData.height) {
@@ -253,19 +265,28 @@ export function isTileWalkable(x, y, mapData, tilesetData) {
 
   const blockId = mapData.blockData[index];
   const tileset = tilesetData.tilesets.find(t => t.tilesetId === mapData.tileset);
-  if (!tileset) return false;
+  if (!tileset || !tileset.blocks || !tileset.impassableTiles) return false;
 
-  const collision = tileset.collision.find(c => c.tileId === blockId);
-  if (!collision) return false;
+  const block = tileset.blocks[blockId];
+  if (!block) return false;
 
-  const typeInfo = getCollisionType(collision.value);
-  return typeInfo.walkable;
+  // Check if any tile in the 4x4 block is walkable
+  for (let tileRow = 0; tileRow < 4; tileRow++) {
+    for (let tileCol = 0; tileCol < 4; tileCol++) {
+      const tileId = block.tiles[tileRow][tileCol];
+      if (isTilePassable(tileId, tileset.impassableTiles)) {
+        return true;
+      }
+    }
+  }
+  
+  return false;
 }
 
 /**
  * Check if a specific tile is surfable
- * @param {number} x - Tile X coordinate
- * @param {number} y - Tile Y coordinate
+ * @param {number} x - Block X coordinate
+ * @param {number} y - Block Y coordinate
  * @param {Object} mapData - Map data
  * @param {Object} tilesetData - Tileset data
  * @returns {boolean} - True if surfable
@@ -282,11 +303,22 @@ export function isTileSurfable(x, y, mapData, tilesetData) {
 
   const blockId = mapData.blockData[index];
   const tileset = tilesetData.tilesets.find(t => t.tilesetId === mapData.tileset);
-  if (!tileset) return false;
+  if (!tileset || !tileset.blocks || !tileset.impassableTiles) return false;
 
-  const collision = tileset.collision.find(c => c.tileId === blockId);
-  if (!collision) return false;
+  const block = tileset.blocks[blockId];
+  if (!block) return false;
 
-  const typeInfo = getCollisionType(collision.value);
-  return typeInfo.surfable;
+  // Check if any tile in the 4x4 block is surfable water
+  const waterTiles = [0x14, 0x32, 0x48];
+  for (let tileRow = 0; tileRow < 4; tileRow++) {
+    for (let tileCol = 0; tileCol < 4; tileCol++) {
+      const tileId = block.tiles[tileRow][tileCol];
+      const tileInfo = getTileCollisionInfo(tileId, tileset);
+      if (tileInfo.surfable) {
+        return true;
+      }
+    }
+  }
+  
+  return false;
 }

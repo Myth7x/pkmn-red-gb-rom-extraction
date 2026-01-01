@@ -6,6 +6,7 @@
  */
 
 import { MAX_WARP_EVENTS, MAX_BG_EVENTS, MAX_OBJECT_EVENTS } from './mapConstants.js';
+import { decodeMovementType, decodeMovementDirection, getMovementDescription } from '../constants/movementTypes.js';
 
 /**
  * Convert bank + pointer to ROM offset
@@ -76,9 +77,14 @@ export function readMapObjects(rom, mapHeader, bank) {
     const pictureId = rom[offset++];
     const y = rom[offset++];
     const x = rom[offset++];
-    const movement = rom[offset++];
-    const range = rom[offset++];  // range/direction byte
+    const movementByte = rom[offset++];
+    const rangeByte = rom[offset++];  // range/direction byte
     const textIdByte = rom[offset++];
+    
+    // Decode movement bytes
+    const movementType = decodeMovementType(movementByte);
+    const movementDirection = decodeMovementDirection(movementType, rangeByte);
+    const movementDescription = getMovementDescription(movementByte, rangeByte);
     
     // Check if this is a trainer or item
     const TRAINER_FLAG = 0x40;
@@ -107,8 +113,13 @@ export function readMapObjects(rom, mapHeader, bank) {
       pictureId,
       y: y - 4,  // Y is stored as Y+4
       x: x - 4,  // X is stored as X+4
-      movement,
-      range,
+      movement: {
+        byte1: movementByte,
+        byte2: rangeByte,
+        type: movementType,
+        direction: movementDirection,
+        description: movementDescription
+      },
       textId,
       type,
       ...(trainerClass !== null && { trainerClass, trainerNumber }),

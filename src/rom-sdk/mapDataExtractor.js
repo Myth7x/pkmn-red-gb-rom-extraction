@@ -23,7 +23,7 @@ import {
   readTilesetCollision,
   readTilesetGraphics,
   decode2bppTile,
-  getCollisionType
+  getTileCollisionInfo
 } from './tilesetBlockReader.js';
 import { analyzeTileMetadata, generateMetadataSummary } from './tileMetadata.js';
 
@@ -211,31 +211,21 @@ export function extractAllTilesets(rom) {
       // Read blocks (metatiles - 4x4 tile arrangements)
       const blocks = readTilesetBlocks(rom, header, 256);
       
-      // Read collision data
-      const collision = readTilesetCollision(rom, header, 256);
+      // Read collision data (list of impassable tile IDs)
+      const impassableTiles = readTilesetCollision(rom, header);
       
       // Read raw graphics (we'll process this separately for PNG export)
       const graphics = readTilesetGraphics(rom, header, 256);
 
       tilesets.push({
         ...header,
-        blocks: blocks.map(b => Array.from(b)),
-        collision: Array.from(collision).map((c, i) => {
-          const typeInfo = getCollisionType(c);
-          return {
-            tileId: i,
-            value: c,
-            type: typeInfo.type,
-            walkable: typeInfo.walkable,
-            surfable: typeInfo.surfable,
-            description: typeInfo.description
-          };
-        }),
+        blocks: blocks, // Now structured with tile IDs
+        impassableTiles: impassableTiles, // Array of impassable tile IDs
         graphicsSize: graphics.length,
         graphicsOffset: `Included (${graphics.length} bytes)`
       });
 
-      console.log(`[OK] Tileset ${header.tilesetId}: ${tilesets[tilesets.length - 1].blocks.length} blocks, ${graphics.length} bytes graphics`);
+      console.log(`[OK] Tileset ${header.tilesetId}: ${blocks.length} blocks, ${impassableTiles.length} impassable tiles, ${graphics.length} bytes graphics`);
     } catch (error) {
       console.warn(`[WARNING] Failed to extract tileset ${header.tilesetId}: ${error.message}`);
     }

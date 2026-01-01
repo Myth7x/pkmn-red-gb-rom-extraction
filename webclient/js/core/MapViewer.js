@@ -10,6 +10,7 @@ import { MapDataManager } from '../data/MapDataManager.js';
 import { TilesetManager } from '../data/TilesetManager.js';
 import { SpriteManager } from '../data/SpriteManager.js';
 import { CanvasRenderer } from '../rendering/CanvasRenderer.js';
+import { NPCMovementEngine } from '../movement/NPCMovement.js';
 
 // Import module versions
 import { MODULE_VERSION as CONFIG_VERSION } from './Config.js';
@@ -51,6 +52,10 @@ export class MapViewer {
         this.mapDataManager = new MapDataManager(this.config);
         this.tilesetManager = new TilesetManager(this.config);
         this.spriteManager = new SpriteManager(this.config);
+        
+        // Movement engine
+        this.movementEngine = new NPCMovementEngine();
+        this.movementEnabled = true; // Toggle for NPC movement
         
         // State management
         this.preferences = new PreferencesManager();
@@ -113,6 +118,9 @@ export class MapViewer {
             
             Logger.success('Initialization complete!');
             
+            // Start continuous render loop for animations
+            this.startRenderLoop();
+            
         } catch (error) {
             this.errorHandler.handle(error, 'Initialization');
             const loadingEl = document.getElementById('loading');
@@ -122,12 +130,35 @@ export class MapViewer {
         }
     }
     
+    /**
+     * Continuous render loop for animations
+     */
+    startRenderLoop() {
+        let lastFrameTime = Date.now();
+        
+        const loop = () => {
+            const now = Date.now();
+            const delta = now - lastFrameTime;
+            
+            // Render at ~60 FPS (16.67ms per frame)
+            if (delta >= 16) {
+                if (this.movementEnabled && this.movementEngine.isRunning) {
+                    this.render();
+                }
+                lastFrameTime = now;
+            }
+            
+            requestAnimationFrame(loop);
+        };
+        
+        loop();
+    }
+    
     restorePreferences() {
         // Restore zoom
         const savedZoom = this.preferences.loadZoom(this.config.defaults.zoom);
         if (savedZoom >= 1 && savedZoom <= 8) {
             this.viewportState.setScale(savedZoom);
-            Logger.log(`Restored zoom level: ${savedZoom}x`);
         }
         
         // Restore overlay settings
@@ -136,11 +167,6 @@ export class MapViewer {
         this.showGrid = overlaySettings.showGrid;
         this.showCoordLabels = overlaySettings.showCoordLabels;
         this.showTooltip = overlaySettings.showTooltip !== false; // Default to true
-        
-        Logger.log(`Restored overlays: ${this.showOverlays ? 'ON' : 'OFF'}`);
-        Logger.log(`Restored grid: ${this.showGrid ? 'ON' : 'OFF'}`);
-        Logger.log(`Restored coordinates: ${this.showCoordLabels ? 'ON' : 'OFF'}`);
-        Logger.log(`Restored tooltip: ${this.showTooltip ? 'ON' : 'OFF'}`);
         
         // Restore sidebar state
         const sidebarHidden = this.preferences.loadSidebarState();
@@ -168,11 +194,8 @@ export class MapViewer {
     render() {
         const currentMap = this.mapState.getCurrentMap();
         if (!currentMap || !this.tilesetManager.hasTileset(currentMap.tileset)) {
-            Logger.warn('Cannot render: missing map or tileset');
             return;
         }
-        
-        Logger.log('Rendering map...');
         
         // Clear canvas
         this.renderer.clear('#000');
@@ -186,10 +209,6 @@ export class MapViewer {
         const mapWidthPixels = currentMap.width * BLOCK_SIZE * TILE_SIZE;
         const mapHeightPixels = currentMap.height * BLOCK_SIZE * TILE_SIZE;
         
-        Logger.info(`Map size: ${mapWidthPixels}x${mapHeightPixels} pixels`);
-        Logger.info(`Canvas size: ${this.renderer.getWidth()}x${this.renderer.getHeight()} pixels`);
-        Logger.info(`Scale: ${scale}x, Offset: (${offset.x}, ${offset.y})`);
-        
         // Calculate visible area
         const startX = Math.max(0, Math.floor(-offset.x / (BLOCK_SIZE * TILE_SIZE * scale)));
         const startY = Math.max(0, Math.floor(-offset.y / (BLOCK_SIZE * TILE_SIZE * scale)));
@@ -198,6 +217,21 @@ export class MapViewer {
         
         // Render map blocks with actual tiles
         const allBlockDefs = this.tilesetManager.tilesetBlockDefinitions[currentMap.tileset];
+        
+        // Debug: Log unique block IDs being rendered (once per map load)
+        if (!this._loggedBlockIds) {
+            const uniqueBlocks = new Set();
+            for (let y = startY; y <= endY; y++) {
+                for (let x = startX; x <= endX; x++) {
+                    const idx = y * currentMap.width + x;
+                    if (currentMap.blockData[idx] !== undefined) {
+                        uniqueBlocks.add(currentMap.blockData[idx]);
+                    }
+                }
+            }
+            console.log(`[MapViewer] Rendering ${uniqueBlocks.size} unique blocks:`, Array.from(uniqueBlocks).sort((a,b) => a-b));
+            this._loggedBlockIds = true;
+        }
         
         for (let blockY = startY; blockY <= endY; blockY++) {
             for (let blockX = startX; blockX <= endX; blockX++) {
@@ -213,8 +247,8 @@ export class MapViewer {
                 // Each block is 4x4 tiles
                 for (let tileY = 0; tileY < BLOCK_SIZE; tileY++) {
                     for (let tileX = 0; tileX < BLOCK_SIZE; tileX++) {
-                        const tileIndex = tileY * BLOCK_SIZE + tileX;
-                        const tileId = blockDef[tileIndex];
+                        // Get tile ID from block's 4x4 structure
+                        const tileId = blockDef.tiles[tileY][tileX];
                         
                         if (tileId === undefined) continue;
                         
@@ -233,6 +267,62 @@ export class MapViewer {
                             srcX, srcY, TILE_SIZE, TILE_SIZE,
                             destX, destY, destSize, destSize
                         );
+                    }
+                }
+                
+                // Draw collision overlay using NEW tile-based collision system
+                if (this.showOverlays) {
+                    const blockDef = this.tilesetManager.getBlockDefinition(currentMap.tileset, blockId);
+                    
+                    if (blockDef && blockDef.tiles) {
+                        const tileSize = TILE_SIZE * scale;
+                        const borderWidth = Math.max(1, Math.floor(scale * 0.5));
+                        
+                        // Check each tile in the 4x4 block
+                        for (let tileRow = 0; tileRow < 4; tileRow++) {
+                            for (let tileCol = 0; tileCol < 4; tileCol++) {
+                                const tileId = blockDef.tiles[tileRow][tileCol];
+                                
+                                // Determine overlay color based on tile properties
+                                let overlayColor = null;
+                                let alpha = 0.3;
+                                
+                                // Check tile passability
+                                const isPassable = this.tilesetManager.isTilePassable(currentMap.tileset, tileId);
+                                
+                                // Check tile type (priority: GRASS > FLOWER > WATER > LEDGE > WALL > VOID)
+                                if (this.tilesetManager.isGrassTile(currentMap.tileset, tileId)) {
+                                    // Green for grass tiles (walkable, encounter tiles)
+                                    overlayColor = '#00ff00';
+                                    alpha = 0.25;
+                                } else if (this.tilesetManager.isFlowerTile(currentMap.tileset, tileId)) {
+                                    // Yellow for animated flower tiles (decorative, walkable)
+                                    overlayColor = '#ffff00';
+                                    alpha = 0.3;
+                                } else if (this.tilesetManager.isWaterTile(tileId)) {
+                                    // Blue for water tiles
+                                    overlayColor = '#0044cc';
+                                    alpha = 0.4;
+                                } else if (this.tilesetManager.isLedgeTile(tileId)) {
+                                    // Orange for ledge tiles (jumpable down)
+                                    overlayColor = '#ff8800';
+                                    alpha = 0.4;
+                                } else if (!isPassable) {
+                                    // Red for impassable tiles (walls, void, obstacles)
+                                    overlayColor = '#ff0000';
+                                    alpha = 0.3;
+                                }
+                                
+                                // Draw overlay border if there's a color
+                                if (overlayColor) {
+                                    const tileX = screenBlockX + tileCol * tileSize;
+                                    const tileY = screenBlockY + tileRow * tileSize;
+                                    this.renderer.setAlpha(alpha * 1.5);
+                                    this.renderer.drawRect(tileX, tileY, tileSize, tileSize, overlayColor, false, borderWidth);
+                                    this.renderer.resetAlpha();
+                                }
+                            }
+                        }
                     }
                 }
                 
@@ -287,8 +377,6 @@ export class MapViewer {
         this.renderer.drawRect(mapBoundaryX, mapBoundaryY, mapBoundaryWidth, mapBoundaryHeight, '#ff0', false);
         this.renderer.drawRect(mapBoundaryX - 1, mapBoundaryY - 1, mapBoundaryWidth + 2, mapBoundaryHeight + 2, '#f00', false);
         this.renderer.resetAlpha();
-        
-        Logger.success('Render complete');
     }
     
     renderOverlays(currentMap, offset, scale) {
@@ -348,37 +436,230 @@ export class MapViewer {
      * @param {Object} sprite - Sprite data from map
      * @returns {Object} - {facing: 'down'|'up'|'left'|'right', frameX: number, mirror: boolean}
      */
-    getSpriteFrame(sprite) {
-        // Default to facing down for most cases
-        // Movement types: 0=static, 1=random, 2=up/down, 3=left/right, 254=look around, 255=stand still
+    getSpriteFrame(sprite, facingDirection = 0, animFrame = 0, isWalking = false) {
+        // If movement engine provides facing direction, use it
+        if (facingDirection !== undefined) {
+            // Pokemon Red sprite facing directions:
+            // 0 = DOWN, 4 = UP, 8 = LEFT, 12 = RIGHT
+            let frameX = 0;
+            let mirror = false;
+            
+            if (facingDirection === 0) { // DOWN
+                frameX = 0;
+            } else if (facingDirection === 4) { // UP
+                frameX = 16;
+            } else if (facingDirection === 8) { // LEFT
+                frameX = 32;
+            } else if (facingDirection === 12) { // RIGHT
+                frameX = 32;
+                mirror = true;
+            }
+            
+            // Apply walking animation if sprite is walking
+            // Pokemon Red has 4 animation frames per direction
+            if (isWalking && animFrame > 0) {
+                // Slight frame offset for walking animation
+                // This would need actual sprite sheet layout info
+                // For now, just use the base frame
+            }
+            
+            return {
+                facing: facingDirection === 0 ? 'down' : facingDirection === 4 ? 'up' : facingDirection === 8 ? 'left' : 'right',
+                frameX: frameX,
+                mirror: mirror
+            };
+        }
         
-        // For now, default all sprites to facing down
-        // In future, could parse movement patterns or add facing to map data
+        // Fallback: Check if sprite has movement data with direction
+        if (sprite.movement && sprite.movement.direction) {
+            const dir = sprite.movement.direction;
+            switch (dir) {
+                case 'UP':
+                    return { facing: 'up', frameX: 16, mirror: false };
+                case 'DOWN':
+                    return { facing: 'down', frameX: 0, mirror: false };
+                case 'LEFT':
+                    return { facing: 'left', frameX: 32, mirror: false };
+                case 'RIGHT':
+                    return { facing: 'right', frameX: 32, mirror: true };
+                default:
+                    return { facing: 'down', frameX: 0, mirror: false };
+            }
+        }
+        
+        // Default to facing down
         return {
             facing: 'down',
-            frameX: 0,  // Frame 0 = down (x offset in sprite sheet)
+            frameX: 0,
             mirror: false
         };
+    }
+    
+    /**
+     * Render movement path visualization for an NPC
+     * Shows the area where the NPC can walk based on movement type and range
+     * @param {Object} sprite - Sprite data
+     * @param {Object} offset - Map render offset
+     * @param {number} scale - Current zoom scale
+     */
+    renderMovementPath(sprite, offset, scale) {
+        if (!sprite.movement) return;
         
-        // Future enhancement: movement-based facing
-        // if (sprite.movement === 2) return { facing: 'up', frameX: 16, mirror: false };
-        // if (sprite.movement === 3) return { facing: 'left', frameX: 32, mirror: false };
+        const movement = sprite.movement;
+        const centerX = offset.x + sprite.x * 2 * TILE_SIZE * scale;
+        const centerY = offset.y + sprite.y * 2 * TILE_SIZE * scale;
+        const tileSize = 2 * TILE_SIZE * scale;
+        
+        // Skip if NPC doesn't move (STAY type)
+        if (movement.type === 'STAY') {
+            // Draw facing indicator arrow for stationary NPCs
+            if (movement.direction && movement.direction !== 'NONE') {
+                this.drawFacingArrow(centerX, centerY, tileSize, movement.direction);
+            }
+            return;
+        }
+        
+        // Get range (defaults from constants.asm)
+        const range = sprite.range || 0;
+        if (range === 0) return; // No movement area
+        
+        // Draw movement area based on movement type
+        this.renderer.save();
+        this.renderer.setAlpha(0.15);
+        
+        switch (movement.type) {
+            case 'WALK':
+                // Walking NPCs can move within their range
+                switch (movement.direction) {
+                    case 'ANY_DIR':
+                        // Can walk in all directions - draw a square area
+                        const areaSize = (range * 2 + 1) * tileSize;
+                        const areaX = centerX - range * tileSize;
+                        const areaY = centerY - range * tileSize;
+                        this.renderer.drawRect(areaX, areaY, areaSize, areaSize, 'rgba(100, 200, 255, 0.8)', true);
+                        this.renderer.setStrokeStyle('rgba(50, 150, 255, 0.8)', 2);
+                        this.renderer.drawRect(areaX, areaY, areaSize, areaSize, 'rgba(50, 150, 255, 0.8)', false);
+                        break;
+                        
+                    case 'UP_DOWN':
+                        // Vertical movement only
+                        const vHeight = (range * 2 + 1) * tileSize;
+                        const vY = centerY - range * tileSize;
+                        this.renderer.drawRect(centerX, vY, tileSize, vHeight, 'rgba(100, 255, 200, 0.8)', true);
+                        this.renderer.setStrokeStyle('rgba(50, 255, 150, 0.8)', 2);
+                        this.renderer.drawRect(centerX, vY, tileSize, vHeight, 'rgba(50, 255, 150, 0.8)', false);
+                        break;
+                        
+                    case 'LEFT_RIGHT':
+                        // Horizontal movement only
+                        const hWidth = (range * 2 + 1) * tileSize;
+                        const hX = centerX - range * tileSize;
+                        this.renderer.drawRect(hX, centerY, hWidth, tileSize, 'rgba(255, 200, 100, 0.8)', true);
+                        this.renderer.setStrokeStyle('rgba(255, 150, 50, 0.8)', 2);
+                        this.renderer.drawRect(hX, centerY, hWidth, tileSize, 'rgba(255, 150, 50, 0.8)', false);
+                        break;
+                }
+                break;
+                
+            case 'LOOK':
+                // Looking around - draw rotation indicator
+                const radius = tileSize * 0.8;
+                this.renderer.drawCircle(
+                    centerX + tileSize / 2,
+                    centerY + tileSize / 2,
+                    radius,
+                    'rgba(255, 255, 100, 0.6)',
+                    true
+                );
+                break;
+        }
+        
+        this.renderer.resetAlpha();
+        this.renderer.restore();
+    }
+    
+    /**
+     * Draw a facing direction arrow for stationary NPCs
+     * @param {number} x - NPC x position
+     * @param {number} y - NPC y position
+     * @param {number} size - Tile size
+     * @param {string} direction - Direction ('UP', 'DOWN', 'LEFT', 'RIGHT')
+     */
+    drawFacingArrow(x, y, size, direction) {
+        const centerX = x + size / 2;
+        const centerY = y + size / 2;
+        const arrowSize = size * 0.3;
+        
+        this.renderer.save();
+        this.renderer.setAlpha(0.7);
+        this.renderer.setStrokeStyle('rgba(255, 255, 0, 0.9)', 3);
+        
+        // Draw arrow based on direction
+        switch (direction) {
+            case 'UP':
+                this.renderer.drawLine(centerX, centerY, centerX, centerY - arrowSize);
+                this.renderer.drawLine(centerX, centerY - arrowSize, centerX - arrowSize / 3, centerY - arrowSize * 0.6);
+                this.renderer.drawLine(centerX, centerY - arrowSize, centerX + arrowSize / 3, centerY - arrowSize * 0.6);
+                break;
+            case 'DOWN':
+                this.renderer.drawLine(centerX, centerY, centerX, centerY + arrowSize);
+                this.renderer.drawLine(centerX, centerY + arrowSize, centerX - arrowSize / 3, centerY + arrowSize * 0.6);
+                this.renderer.drawLine(centerX, centerY + arrowSize, centerX + arrowSize / 3, centerY + arrowSize * 0.6);
+                break;
+            case 'LEFT':
+                this.renderer.drawLine(centerX, centerY, centerX - arrowSize, centerY);
+                this.renderer.drawLine(centerX - arrowSize, centerY, centerX - arrowSize * 0.6, centerY - arrowSize / 3);
+                this.renderer.drawLine(centerX - arrowSize, centerY, centerX - arrowSize * 0.6, centerY + arrowSize / 3);
+                break;
+            case 'RIGHT':
+                this.renderer.drawLine(centerX, centerY, centerX + arrowSize, centerY);
+                this.renderer.drawLine(centerX + arrowSize, centerY, centerX + arrowSize * 0.6, centerY - arrowSize / 3);
+                this.renderer.drawLine(centerX + arrowSize, centerY, centerX + arrowSize * 0.6, centerY + arrowSize / 3);
+                break;
+        }
+        
+        this.renderer.resetAlpha();
+        this.renderer.restore();
     }
     
     renderSprites(currentMap, offset, scale) {
         // Render NPCs/Sprites - ALWAYS shown (not controlled by overlay toggle)
         if (currentMap.objects && currentMap.objects.sprites && currentMap.objects.sprites.data && currentMap.objects.sprites.data.length > 0) {
+            // Get animated sprite positions if movement is enabled
+            const spritePositions = this.movementEnabled ? 
+                this.movementEngine.getSpritePositions() : null;
+            
             currentMap.objects.sprites.data.forEach((sprite, index) => {
-                const x = offset.x + sprite.x * 2 * TILE_SIZE * scale;
-                const y = offset.y + sprite.y * 2 * TILE_SIZE * scale;
+                // Use movement engine position if available, otherwise use static position
+                let spriteX = sprite.x;
+                let spriteY = sprite.y;
+                let facingDirection = 0; // Default facing down
+                let animFrame = 0;
+                let isWalking = false;
+                
+                if (spritePositions && spritePositions[index]) {
+                    const pos = spritePositions[index];
+                    spriteX = pos.pixelX / 16; // Convert pixels back to tiles
+                    spriteY = pos.pixelY / 16;
+                    facingDirection = pos.facingDirection;
+                    animFrame = pos.animFrame;
+                    isWalking = pos.isWalking;
+                }
+                
+                const x = offset.x + spriteX * 2 * TILE_SIZE * scale;
+                const y = offset.y + spriteY * 2 * TILE_SIZE * scale;
                 const size = 2 * TILE_SIZE * scale;
+                
+                // Draw movement path visualization if overlays are enabled
+                if (this.showOverlays && !this.movementEnabled) {
+                    this.renderMovementPath(sprite, offset, scale);
+                }
                 
                 // ROM uses 1-based sprite IDs (1-72), our files use 0-based (0-71)
                 const spriteFileId = sprite.pictureId - 1;
                 
                 // Skip invalid sprite IDs (like 255 = unused/disabled sprites)
                 if (spriteFileId > 71 || spriteFileId < 0) {
-                    Logger.warn(`Skipping invalid sprite pictureId ${sprite.pictureId} at (${sprite.x}, ${sprite.y})`);
                     return;
                 }
                 
@@ -387,7 +668,7 @@ export class MapViewer {
                 
                 if (spriteImg && spriteImg.complete && spriteImg.naturalWidth > 0) {
                     // Get facing direction and frame info
-                    const frameInfo = this.getSpriteFrame(sprite);
+                    const frameInfo = this.getSpriteFrame(sprite, facingDirection, animFrame, isWalking);
                     
                     // Save context for potential mirroring
                     this.renderer.save();
@@ -779,7 +1060,6 @@ export class MapViewer {
     }
     
     showSpriteModal(sprite, romX, romY) {
-        const movementInfo = getMovementInfo(sprite.movement);
         const frameInfo = this.getSpriteFrame(sprite);
         
         const modalContent = document.getElementById('npcModalContent');
@@ -829,13 +1109,35 @@ export class MapViewer {
                     title = 'Invalid Data:';
                 }
                 
+                // Clean up the decoded text for display
+                const cleanText = (text) => {
+                    if (!text) return '';
+                    return text
+                        // Replace control codes with proper formatting
+                        .replace(/\[CONT\]/g, '\n')           // Continue on next line
+                        .replace(/▼\[NULL\]/g, '\n\n')         // Paragraph break
+                        .replace(/▼/g, '\n')                   // Line break
+                        .replace(/\[NULL\]/g, '')              // Remove NULL markers
+                        .replace(/\[PLAYER\]/g, 'RED')         // Player name
+                        .replace(/\[RIVAL\]/g, 'BLUE')         // Rival name
+                        .replace(/\[TARGET\]/g, '')            // Target marker
+                        .replace(/\[USER\]/g, '')              // User marker
+                        .replace(/\[VAR\]/g, '[...]')          // Variable placeholder
+                        .replace(/\[NUM\]/g, '[#]')            // Number placeholder
+                        .replace(/\[BCD\]/g, '[#]')            // BCD number placeholder
+                        .replace(/\[ASM\]/g, '[Code]')         // Assembly code
+                        .trim();
+                };
+                
+                const displayText = cleanText(sprite.scriptText.decodedText);
+                
                 // Display decoded text prominently at the top (always show if exists)
-                const decodedTextHTML = sprite.scriptText.decodedText 
+                const decodedTextHTML = displayText 
                     ? `
                         <div class="mt-3 mb-2 border rounded" role="alert" style="background-color: ${bgStyle}; border-color: ${borderColor} !important; border-width: 2px;">
                             <h6 class="mb-2 p-2" style="color: ${headerColor}; font-weight: bold;"><i class="bi ${iconClass}"></i> ${title}</h6>
                             <div class="p-3 mx-2 mb-2 border rounded" style="font-family: 'Courier New', monospace; font-size: 1.1em; white-space: pre-wrap; line-height: 1.6; background-color: ${textBg}; color: ${textColor}; border-color: ${borderColor} !important;">
-${sprite.scriptText.decodedText}
+${displayText}
                             </div>
                         </div>
                       `
@@ -902,11 +1204,25 @@ ${sprite.scriptText.hexString}
             </div>
             <div class="npc-info-item">
                 <span class="npc-info-label"><i class="bi bi-arrows-move"></i> Movement Type:</span>
-                <span class="npc-info-value">${movementInfo.name} <span class="badge bg-info">${sprite.movement} / 0x${sprite.movement.toString(16).toUpperCase()}</span></span>
+                <span class="npc-info-value">
+                    ${sprite.movement && sprite.movement.type ? 
+                        `<span class="badge bg-info">${sprite.movement.type}</span> 
+                         ${sprite.movement.direction ? `<span class="badge bg-secondary">${sprite.movement.direction}</span>` : ''}` :
+                        `<span class="badge bg-info">0x${(sprite.movement?.byte1 || 0).toString(16).toUpperCase()}</span>`
+                    }
+                </span>
             </div>
+            ${sprite.movement && sprite.movement.description ? `
             <div class="alert alert-secondary mb-2 py-2" role="alert">
-                <small><i class="bi bi-info-circle"></i> <strong>Movement Pattern:</strong> ${movementInfo.description}</small>
+                <small><i class="bi bi-info-circle"></i> <strong>Movement Pattern:</strong> ${sprite.movement.description}</small>
             </div>
+            ` : ''}
+            ${sprite.range !== undefined ? `
+            <div class="npc-info-item">
+                <span class="npc-info-label"><i class="bi bi-bullseye"></i> Movement Range:</span>
+                <span class="npc-info-value badge bg-primary">${sprite.range} tile(s)</span>
+            </div>
+            ` : ''}
             <div class="npc-info-item">
                 <span class="npc-info-label"><i class="bi bi-chat-left-text"></i> Text/Script ID:</span>
                 <span class="npc-info-value badge bg-success">${sprite.textId}</span>
@@ -964,13 +1280,35 @@ ${sprite.scriptText.hexString}
                     title = 'Invalid Data:';
                 }
                 
+                // Clean up the decoded text for display
+                const cleanText = (text) => {
+                    if (!text) return '';
+                    return text
+                        // Replace control codes with proper formatting
+                        .replace(/\[CONT\]/g, '\n')           // Continue on next line
+                        .replace(/▼\[NULL\]/g, '\n\n')         // Paragraph break
+                        .replace(/▼/g, '\n')                   // Line break
+                        .replace(/\[NULL\]/g, '')              // Remove NULL markers
+                        .replace(/\[PLAYER\]/g, 'RED')         // Player name
+                        .replace(/\[RIVAL\]/g, 'BLUE')         // Rival name
+                        .replace(/\[TARGET\]/g, '')            // Target marker
+                        .replace(/\[USER\]/g, '')              // User marker
+                        .replace(/\[VAR\]/g, '[...]')          // Variable placeholder
+                        .replace(/\[NUM\]/g, '[#]')            // Number placeholder
+                        .replace(/\[BCD\]/g, '[#]')            // BCD number placeholder
+                        .replace(/\[ASM\]/g, '[Code]')         // Assembly code
+                        .trim();
+                };
+                
+                const displayText = cleanText(sign.scriptText.decodedText);
+                
                 // Display decoded text prominently at the top (always show if exists)
-                const decodedTextHTML = sign.scriptText.decodedText 
+                const decodedTextHTML = displayText 
                     ? `
                         <div class="mt-3 mb-2 border rounded" role="alert" style="background-color: ${bgStyle}; border-color: ${borderColor} !important; border-width: 2px;">
                             <h6 class="mb-2 p-2" style="color: ${headerColor}; font-weight: bold;"><i class="bi ${iconClass}"></i> ${title}</h6>
                             <div class="p-3 mx-2 mb-2 border rounded" style="font-family: 'Courier New', monospace; font-size: 1.1em; white-space: pre-wrap; line-height: 1.6; background-color: ${textBg}; color: ${textColor}; border-color: ${borderColor} !important;">
-${sign.scriptText.decodedText}
+${displayText}
                             </div>
                         </div>
                       `
@@ -1051,12 +1389,48 @@ ${sign.scriptText.hexString}
         const blockIndex = blockY * currentMap.width + blockX;
         const blockId = currentMap.blockData[blockIndex];
         
-        // Get tile ID from block definition
-        const blockDefinitions = this.tilesetManager.tilesetBlockDefinitions[currentMap.tileset];
-        let tileId = '?';
-        if (blockDefinitions && blockId < blockDefinitions.length) {
-            const blockDef = blockDefinitions[blockId];
-            tileId = blockDef[tileIndex];
+        // Get tile ID from block definition (NEW: tile-based system)
+        const tileId = this.tilesetManager.getTileInBlock(currentMap.tileset, blockId, tileY, tileX);
+        
+        // Get collision info for this specific TILE (not block)
+        let collisionColor = '#999';
+        let collisionIcon = '⬜';
+        let collisionInfo = null;
+        
+        if (tileId !== null) {
+            const isPassable = this.tilesetManager.isTilePassable(currentMap.tileset, tileId);
+            const isGrass = this.tilesetManager.isGrassTile(currentMap.tileset, tileId);
+            const isWater = this.tilesetManager.isWaterTile(tileId);
+            const isLedge = this.tilesetManager.isLedgeTile(tileId);
+            
+            // Build collision info object for display
+            collisionInfo = {
+                tileId: tileId,
+                walkable: isPassable,
+                surfable: isWater,
+                type: 'PASSABLE'
+            };
+            
+            if (isGrass) {
+                collisionInfo.type = 'GRASS';
+                collisionColor = '#00ff00';
+                collisionIcon = '🌿';
+            } else if (isWater) {
+                collisionInfo.type = 'WATER';
+                collisionColor = '#0066ff';
+                collisionIcon = '🌊';
+            } else if (isLedge) {
+                collisionInfo.type = 'LEDGE';
+                collisionColor = '#ff8800';
+                collisionIcon = '⬇️';
+            } else if (!isPassable) {
+                collisionInfo.type = 'WALL';
+                collisionColor = '#ff0000';
+                collisionIcon = '🧱';
+            } else {
+                collisionColor = '#00ff88';
+                collisionIcon = '✅';
+            }
         }
         
         // Build tooltip content
@@ -1068,6 +1442,20 @@ ${sign.scriptText.hexString}
         content += `Block Position: (${blockX}, ${blockY})<br>`;
         content += `Block ID: ${blockId} (0x${blockId.toString(16).toUpperCase().padStart(2, '0')})<br>`;
         content += `Block Index: ${blockIndex}<br>`;
+        
+        // Add collision info
+        if (collisionInfo) {
+            content += `<div style="border-top: 1px solid #666; margin: 4px 0;"></div>`;
+            content += `<div style="font-weight: bold; color: ${collisionColor};">${collisionIcon} Collision Type</div>`;
+            content += `Type: <span style="color: ${collisionColor};">${collisionInfo.type}</span><br>`;
+            content += `Walkable: <span style="color: ${collisionInfo.walkable ? '#00ff00' : '#ff0000'};">${collisionInfo.walkable ? 'Yes ✓' : 'No ✗'}</span><br>`;
+            if (collisionInfo.surfable) {
+                content += `Surfable: <span style="color: #0088ff;">Yes 🏄</span><br>`;
+            }
+            if (collisionInfo.description) {
+                content += `<span style="color: #aaa; font-size: 0.9em;">${collisionInfo.description}</span><br>`;
+            }
+        }
         
         // Check for objects at this position
         if (currentMap.objects) {
@@ -1083,13 +1471,20 @@ ${sign.scriptText.hexString}
             const warp = currentMap.objects.warps?.data?.find(w => w.x === romX && w.y === romY);
             if (warp) {
                 hasObjects = true;
-                objectsInfo += `🚪 Warp → Map ${warp.mapId} (ROM: ${warp.x},${warp.y})<br>`;
+                objectsInfo += `🚪 <span style="color: #ffff00; font-weight: bold;">Warp</span><br>`;
+                objectsInfo += `   Destination: <span style="color: #00ffff;">Map ${warp.mapId}</span><br>`;
+                if (warp.destWarpId !== undefined) {
+                    objectsInfo += `   Warp ID: <span style="color: #ffaa00;">${warp.destWarpId}</span><br>`;
+                }
+                objectsInfo += `   <span style="color: #888;">Position: (${warp.x}, ${warp.y})</span><br>`;
             }
             
             const sign = currentMap.objects.signs?.data?.find(s => s.x === romX && s.y === romY);
             if (sign) {
                 hasObjects = true;
-                objectsInfo += `📋 Sign (Text ${sign.textId}) (ROM: ${sign.x},${sign.y})<br>`;
+                objectsInfo += `📋 <span style="color: #88ff88; font-weight: bold;">Sign/Script</span><br>`;
+                objectsInfo += `   Text ID: <span style="color: #ffff00;">${sign.textId}</span><br>`;
+                objectsInfo += `   <span style="color: #888;">Position: (${sign.x}, ${sign.y})</span><br>`;
             }
             
             const sprite = currentMap.objects.sprites?.data?.find(s => s.x === romX && s.y === romY);
@@ -1097,11 +1492,12 @@ ${sign.scriptText.hexString}
                 hasObjects = true;
                 const frameInfo = this.getSpriteFrame(sprite);
                 const movementInfo = getMovementInfo(sprite.movement);
-                objectsInfo += `👤 ${sprite.type.toUpperCase()} (Pic ${sprite.pictureId})<br>`;
-                objectsInfo += `<span style="color: #ffa500;">   Facing: ${frameInfo.facing}</span><br>`;
-                objectsInfo += `<span style="color: #88ff88;">   Movement: ${movementInfo.name}</span><br>`;
-                objectsInfo += `<span style="color: #aaaaaa; font-size: 0.9em;">   ${movementInfo.description}</span><br>`;
-                objectsInfo += `<span style="color: #cccccc;">   Text ID: ${sprite.textId}</span><br>`;
+                objectsInfo += `👤 <span style="color: #ff88ff; font-weight: bold;">${sprite.type.toUpperCase()}</span><br>`;
+                objectsInfo += `   <span style="color: #ffa500;">Picture ID: ${sprite.pictureId}</span><br>`;
+                objectsInfo += `   <span style="color: #ffff00;">Text/Script ID: ${sprite.textId}</span><br>`;
+                objectsInfo += `   <span style="color: #00ff88;">Facing: ${frameInfo.facing}</span><br>`;
+                objectsInfo += `   <span style="color: #88ff88;">Movement: ${movementInfo.name}</span><br>`;
+                objectsInfo += `   <span style="color: #aaa; font-size: 0.85em;">${movementInfo.description}</span><br>`;
             }
             
             if (hasObjects) {
@@ -1154,11 +1550,16 @@ ${sign.scriptText.hexString}
         if (zoomOutBtn) zoomOutBtn.addEventListener('click', () => this.zoomOut());
         if (resetZoomBtn) resetZoomBtn.addEventListener('click', () => this.resetView());
         
+        // Debug controls
+        const printCollisionBtn = document.getElementById('printCollisionBtn');
+        if (printCollisionBtn) printCollisionBtn.addEventListener('click', () => this.printCollisionData());
+        
         // Overlay toggles
         const overlaysCheckbox = document.getElementById('showOverlaysCheckbox');
         const gridCheckbox = document.getElementById('showGridCheckbox');
         const coordsCheckbox = document.getElementById('showCoordsCheckbox');
         const tooltipCheckbox = document.getElementById('showTooltipCheckbox');
+        const npcMovementCheckbox = document.getElementById('npcMovementCheckbox');
         
         if (overlaysCheckbox) {
             overlaysCheckbox.checked = this.showOverlays;
@@ -1194,6 +1595,22 @@ ${sign.scriptText.hexString}
                 this.preferences.saveShowTooltip(this.showTooltip);
                 if (!this.showTooltip) {
                     this.hideTooltip();
+                }
+            });
+        }
+        
+        if (npcMovementCheckbox) {
+            npcMovementCheckbox.checked = this.movementEnabled;
+            npcMovementCheckbox.addEventListener('change', (e) => {
+                this.movementEnabled = e.target.checked;
+                if (this.movementEnabled) {
+                    Logger.log('NPC movement enabled');
+                    this.movementEngine.start();
+                } else {
+                    Logger.log('NPC movement disabled');
+                    this.movementEngine.stop();
+                    this.movementEngine.resetAllSprites();
+                    this.render(); // Re-render with static positions
                 }
             });
         }
@@ -1242,6 +1659,98 @@ ${sign.scriptText.hexString}
         this.preferences.saveShowCoordLabels(this.showCoordLabels);
         Logger.log(`Coordinates: ${this.showCoordLabels ? 'ON' : 'OFF'}`);
         this.render();
+    }
+    
+    printCollisionData() {
+        console.clear();
+        console.log('═══════════════════════════════════════════════════════');
+        console.log('🗺️  COLLISION DATA DEBUG');
+        console.log('═══════════════════════════════════════════════════════');
+        
+        if (!this.currentMap) {
+            console.log('\nNo map currently loaded - will show data from first available tileset');
+        } else {
+            console.log(`\nCurrent Map: ${this.currentMap.name} (ID: ${this.currentMap.id})`);
+        }
+        
+        // Get tileset ID
+        let tilesetId = this.currentMap ? this.currentMap.tileset : null;
+        
+        // If no map loaded, use first available tileset
+        if (tilesetId === null) {
+            const availableTilesets = Object.keys(this.tilesetManager.tilesetCollisionData || {});
+            console.log('Available tilesets:', availableTilesets);
+            if (availableTilesets.length > 0) {
+                tilesetId = parseInt(availableTilesets[0]);
+                console.log(`Using first available tileset: ${tilesetId}`);
+            } else {
+                console.error('No tileset data available!');
+                console.log('Full tilesetCollisionData:', this.tilesetManager.tilesetCollisionData);
+                return;
+            }
+        }
+        
+        console.log(`\nTileset ID: ${tilesetId}`);
+        
+        const collisionData = this.tilesetManager.tilesetCollisionData[tilesetId];
+        
+        if (!collisionData) {
+            console.warn(`⚠️  No collision data found for tileset ${tilesetId}`);
+            console.log('\n� Available tilesets:', Object.keys(this.tilesetManager.tilesetCollisionData));
+            return;
+        }
+        
+        console.log(`📦 Total Collision Entries: ${Object.values(collisionData).length}`);
+        
+        // Calculate statistics
+        const stats = {
+            walkable: 0,
+            blocked: 0,
+            types: {}
+        };
+        
+        Object.values(collisionData).forEach(entry => {
+            if (entry.walkable) {
+                stats.walkable++;
+            } else {
+                stats.blocked++;
+            }
+            
+            const type = entry.type || 'UNKNOWN';
+            stats.types[type] = (stats.types[type] || 0) + 1;
+        });
+        
+        console.log(`\n🚶 Walkable Tiles: ${stats.walkable} (${(stats.walkable/Object.values(collisionData).length*100).toFixed(1)}%)`);
+        console.log(`🚫 Blocked Tiles: ${stats.blocked} (${(stats.blocked/Object.values(collisionData).length*100).toFixed(1)}%)`);
+        
+        console.log('\n📋 Collision Types Distribution:');
+        Object.entries(stats.types)
+            .sort((a, b) => b[1] - a[1])
+            .forEach(([type, count]) => {
+                const pct = (count/Object.values(collisionData).length*100).toFixed(1);
+                console.log(`   ${type.padEnd(20)} ${count.toString().padStart(3)} (${pct}%)`);
+            });
+        
+        // Sample tiles
+        console.log('\n🔍 Sample Collision Values (first 20):');
+        console.table(
+            Object.values(collisionData).slice(0, 20).map(entry => ({
+                'Tile ID': entry.tileId,
+                'Value (hex)': '0x' + entry.value.toString(16).toUpperCase().padStart(2, '0'),
+                'Value (dec)': entry.value,
+                'Type': entry.type,
+                'Walkable': entry.walkable ? '✓' : '✗',
+                'Description': entry.description || '-'
+            }))
+        );
+        
+        // Full data
+        console.log('\n📦 Full Collision Data Array:');
+        console.log(collisionData);
+        
+        console.log('\n═══════════════════════════════════════════════════════');
+        console.log('✅ Collision data printed to console');
+        console.log('═══════════════════════════════════════════════════════\n');
     }
     
     toggleSidebar() {
@@ -1395,8 +1904,14 @@ ${sign.scriptText.hexString}
     async loadMap(mapId, options = {}) {
         const { suppressErrorUI = false } = options;
         
+        // Reset debug flags when loading a new map
+        this._loggedBlockIds = false;
+        
         try {
             const mapData = await this.mapDataManager.loadMap(mapId);
+            
+            console.log(`[MapViewer] Loading map ${mapId}: ${mapData.name}, tileset: ${mapData.tileset}, size: ${mapData.width}x${mapData.height} blocks`);
+            console.log(`[MapViewer] First 10 blockIds:`, mapData.blockData.slice(0, 10));
             
             // Load tileset if needed
             if (!this.tilesetManager.hasTileset(mapData.tileset)) {
@@ -1408,6 +1923,20 @@ ${sign.scriptText.hexString}
             if (!this.tilesetManager.hasBlockDefinitions(mapData.tileset)) {
                 Logger.log(`Loading block definitions for tileset ${mapData.tileset}...`);
                 await this.tilesetManager.loadTilesetBlocks(mapData.tileset);
+                
+                // Debug: Show first block definition and its collision
+                const firstBlockDef = this.tilesetManager.getBlockDefinition(mapData.tileset, 0);
+                console.log(`[MapViewer] First block (ID=0) definition:`, firstBlockDef);
+                if (firstBlockDef && firstBlockDef.tiles) {
+                    // Show collision info for first row of tiles (4 tiles)
+                    console.log(`[MapViewer] First block tile collision info:`, 
+                        firstBlockDef.tiles[0].map(tileId => ({
+                            tileId,
+                            walkable: this.tilesetManager.isTileWalkable(mapData.tileset, tileId),
+                            collision: this.tilesetManager.getTileCollision(mapData.tileset, tileId)
+                        }))
+                    );
+                }
             }
             
             // Load sprite metadata if needed
@@ -1415,6 +1944,15 @@ ${sign.scriptText.hexString}
                 Logger.log(`Preloading ${mapData.objects.sprites.data.length} sprites...`);
                 const spriteIds = mapData.objects.sprites.data.map(s => s.pictureId);
                 await this.spriteManager.preloadSprites(spriteIds);
+                
+                // Initialize movement engine with sprite data
+                Logger.log(`Initializing NPC movement engine with ${mapData.objects.sprites.data.length} sprites...`);
+                this.movementEngine.setTilesetManager(this.tilesetManager);
+                this.movementEngine.setCurrentMap(mapData);
+                this.movementEngine.initializeSprites(mapData.objects.sprites.data);
+                if (this.movementEnabled) {
+                    this.movementEngine.start();
+                }
             }
             
             // Set current map

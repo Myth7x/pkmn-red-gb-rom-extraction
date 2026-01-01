@@ -213,8 +213,9 @@ export function extractScriptText(rom, mapHeader, bank, textId) {
     // Extract raw text bytes
     const textData = extractRawTextBytes(rom, textDataPtr, bank);
     
-    // Decode text to readable string
-    const decodedText = decodeText(textData.bytes);
+    // Decode text to readable string (passing ROM so we can follow TX_FAR commands)
+    const textDataOffset = bankPointerToOffset(bank, textDataPtr);
+    const decodedText = decodeText(textData.bytes, rom, textDataOffset);
     
     return {
       textId,
@@ -311,26 +312,160 @@ export const POKEMON_CHAR_MAP = {
 
 /**
  * Decode Pokemon Red text bytes to readable string
+ * Handles text commands like TX_FAR, TX_START, etc.
+ * @param {Buffer} rom - ROM buffer for following TX_FAR pointers
  * @param {Array<number>} bytes - Array of text bytes
+ * @param {number} romOffset - ROM offset of this text (for TX_FAR resolution)
  * @returns {string} - Decoded text
  */
-export function decodeText(bytes) {
+export function decodeText(bytes, rom = null, romOffset = 0) {
   let result = '';
+  let i = 0;
+  const MAX_RECURSION = 5;
+  let recursionDepth = 0;
   
-  for (let i = 0; i < bytes.length; i++) {
-    const byte = bytes[i];
+  // Text command constants
+  const TX_START = 0x00;
+  const TX_RAM = 0x01;
+  const TX_BCD = 0x02;
+  const TX_MOVE = 0x03;
+  const TX_BOX = 0x04;
+  const TX_LOW = 0x05;
+  const TX_PROMPT_BUTTON = 0x06;
+  const TX_SCROLL = 0x07;
+  const TX_START_ASM = 0x08;
+  const TX_NUM = 0x09;
+  const TX_PAUSE = 0x0A;
+  const TX_SOUND = 0x0B;
+  const TX_DOTS = 0x0C;
+  const TX_WAIT_BUTTON = 0x0D;
+  const TX_FAR = 0x17;
+  const TX_END = 0x50;
+  
+  while (i < bytes.length) {
+    const byte = bytes[i++];
     
-    // Check if we have a mapping for this byte
+    // Text terminator
+    if (byte === TX_END) {
+      break;
+    }
+    
+    // TX_FAR command - read text from different bank (3 bytes: ptr_low, ptr_high, bank)
+    if (byte === TX_FAR) {
+      if (i + 2 < bytes.length && rom && recursionDepth < MAX_RECURSION) {
+        const ptrLow = bytes[i++];
+        const ptrHigh = bytes[i++];
+        const bank = bytes[i++];
+        const farPtr = ptrLow | (ptrHigh << 8);
+        
+        // Calculate ROM offset from bank + pointer
+        let farOffset = null;
+        if (farPtr >= 0x4000 && farPtr < 0x8000) {
+          farOffset = (bank - 1) * 0x4000 + farPtr;
+        } else if (farPtr < 0x4000) {
+          farOffset = farPtr;
+        }
+        
+        if (farOffset !== null && farOffset < rom.length) {
+          // Read and decode the far text recursively
+          const farBytes = [];
+          for (let j = farOffset; j < rom.length && farBytes.length < 1000; j++) {
+            const b = rom[j];
+            farBytes.push(b);
+            if (b === TX_END) break;
+          }
+          recursionDepth++;
+          result += decodeText(farBytes, rom, farOffset);
+          recursionDepth--;
+        } else {
+          result += `[BAD_FAR:${farPtr.toString(16)}@${bank}]`;
+        }
+      } else {
+        result += `[TX_FAR]`;
+        i += 3; // Skip the 3 parameter bytes
+      }
+      continue;
+    }
+    
+    // TX_START command - inline text follows until 0x50
+    if (byte === TX_START) {
+      while (i < bytes.length) {
+        const ch = bytes[i++];
+        if (ch === TX_END) break;
+        result += POKEMON_CHAR_MAP[ch] || `[${ch.toString(16).toUpperCase().padStart(2, '0')}]`;
+      }
+      continue;
+    }
+    
+    // TX_RAM - variable placeholder
+    if (byte === TX_RAM) {
+      result += '[VAR]';
+      i += 2; // Skip 2-byte address
+      continue;
+    }
+    
+    // TX_NUM - number placeholder
+    if (byte === TX_NUM) {
+      result += '[NUM]';
+      i += 3; // Skip address (2) + flags (1)
+      continue;
+    }
+    
+    // TX_BCD - BCD number
+    if (byte === TX_BCD) {
+      result += '[BCD]';
+      i += 3; // Skip address (2) + flags (1)
+      continue;
+    }
+    
+    // TX_MOVE - reposition cursor
+    if (byte === TX_MOVE) {
+      i += 2; // Skip 2-byte destination
+      continue;
+    }
+    
+    // TX_BOX - draw text box
+    if (byte === TX_BOX) {
+      i += 4; // Skip address (2) + height (1) + width (1)
+      continue;
+    }
+    
+    // TX_SCROLL - scroll text up
+    if (byte === TX_SCROLL) {
+      result += '\n';
+      continue;
+    }
+    
+    // TX_LOW, TX_PROMPT_BUTTON, TX_PAUSE, TX_WAIT_BUTTON - no parameters, just formatting
+    if ([TX_LOW, TX_PROMPT_BUTTON, TX_PAUSE, TX_WAIT_BUTTON].includes(byte)) {
+      continue;
+    }
+    
+    // TX_START_ASM - assembly code follows (can't parse)
+    if (byte === TX_START_ASM) {
+      result += '[ASM]';
+      break;
+    }
+    
+    // TX_DOTS - print N dots
+    if (byte === TX_DOTS) {
+      const count = i < bytes.length ? bytes[i++] : 3;
+      result += '…'.repeat(count || 3);
+      continue;
+    }
+    
+    // TX_SOUND - sound effect (1 byte parameter)
+    if (byte >= TX_SOUND && byte <= 0x16) {
+      i++; // Skip sound ID
+      continue;
+    }
+    
+    // Regular character
     if (POKEMON_CHAR_MAP.hasOwnProperty(byte)) {
       result += POKEMON_CHAR_MAP[byte];
     } else {
       // Unknown character - show as hex
       result += `[${byte.toString(16).toUpperCase().padStart(2, '0')}]`;
-    }
-    
-    // Stop at END marker
-    if (byte === 0x50) {
-      break;
     }
   }
   
