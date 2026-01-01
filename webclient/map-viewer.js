@@ -2,7 +2,7 @@
 // Renders maps using extracted map data and tileset textures
 
 // Version information
-const MAP_VIEWER_VERSION = '2.4.1';
+const MAP_VIEWER_VERSION = '2.5.0';
 const MAP_VIEWER_BUILD_DATE = '2025-12-31';
 
 console.log('🎮 Pokemon Red Map Viewer - Starting initialization...');
@@ -19,6 +19,8 @@ let lastOverworldMapId = null; // Track the last overworld map (for map 255 warp
 let mapDataCache = {};
 let tilesetImages = {};
 let tilesetBlockDefinitions = {}; // Cache for block definitions from tilesets_complete.json
+let overworldSprites = {}; // Cache for loaded overworld sprite images
+let overworldSpriteData = null; // Metadata from overworld_sprites.json
 let canvas, ctx;
 let scale = 2;
 let offsetX = 0;
@@ -27,6 +29,7 @@ let isDragging = false;
 let dragStartX = 0;
 let dragStartY = 0;
 let showOverlays = true; // Toggle for warp/script/sign/sprite indicators
+let showGrid = false; // Toggle for grid overlay (default: off)
 let showCoordLabels = false; // Toggle for coordinate labels on blocks (default: off)
 let hoveredTile = null; // Track hovered tile for highlighting {blockX, blockY, tileX, tileY, tileIndex, screenX, screenY}
 
@@ -34,9 +37,15 @@ let hoveredTile = null; // Track hovered tile for highlighting {blockX, blockY, 
 function showError(message) {
     console.error('❌ Error:', message);
     const errorEl = document.getElementById('errorMessage');
-    errorEl.textContent = message;
-    errorEl.classList.add('show');
-    setTimeout(() => errorEl.classList.remove('show'), 5000);
+    if (errorEl) {
+        errorEl.textContent = message;
+        const toastEl = document.getElementById('errorToast');
+        const toast = new bootstrap.Toast(toastEl, { delay: 5000 });
+        toast.show();
+    } else {
+        // Fallback if Bootstrap isn't loaded yet
+        alert('Error: ' + message);
+    }
 }
 
 // Version footer
@@ -65,6 +74,8 @@ function zoomIn() {
         offsetY = centerY - (centerY - offsetY) * (scale / oldScale);
         
         console.log(`🔍 Zoom: ${scale}x`);
+        localStorage.setItem('mapViewerZoom', scale); // Save zoom level
+        updateZoomDisplay();
         renderMap();
     }
 }
@@ -82,6 +93,8 @@ function zoomOut() {
         offsetY = centerY - (centerY - offsetY) * (scale / oldScale);
         
         console.log(`🔍 Zoom: ${scale}x`);
+        localStorage.setItem('mapViewerZoom', scale); // Save zoom level
+        updateZoomDisplay();
         renderMap();
     }
 }
@@ -91,6 +104,8 @@ function resetView() {
     scale = 2;
     offsetX = 50;
     offsetY = 50;
+    localStorage.setItem('mapViewerZoom', scale); // Save zoom level
+    updateZoomDisplay();
     renderMap();
 }
 window.resetView = resetView;
@@ -117,13 +132,19 @@ function toggleSidebar() {
     
     sidebar.classList.toggle('hidden');
     
-    if (sidebar.classList.contains('hidden')) {
+    const isHidden = sidebar.classList.contains('hidden');
+    
+    if (isHidden) {
         toggleBtn.classList.remove('sidebar-visible');
         toggleBtn.textContent = '☰';
     } else {
         toggleBtn.classList.add('sidebar-visible');
         toggleBtn.textContent = '✕';
     }
+    
+    // Save sidebar state to localStorage
+    localStorage.setItem('mapViewerSidebarHidden', isHidden);
+    console.log(`📋 Sidebar: ${isHidden ? 'HIDDEN' : 'VISIBLE'} (saved)`);
     
     // Re-render map after sidebar animation completes
     setTimeout(() => {
@@ -164,6 +185,35 @@ async function init() {
         // Disable image smoothing for pixel-perfect rendering
         ctx.imageSmoothingEnabled = false;
         
+        // Restore saved zoom level from localStorage
+        const savedZoom = localStorage.getItem('mapViewerZoom');
+        if (savedZoom) {
+            const zoomValue = parseInt(savedZoom, 10);
+            if (zoomValue >= 1 && zoomValue <= 8) {
+                scale = zoomValue;
+                console.log(`🔍 Restored zoom level: ${scale}x`);
+            }
+        }
+        
+        // Restore debug panel options from localStorage
+        const savedOverlays = localStorage.getItem('mapViewerShowOverlays');
+        if (savedOverlays !== null) {
+            showOverlays = savedOverlays === 'true';
+            console.log(`🔄 Restored overlays: ${showOverlays ? 'ON' : 'OFF'}`);
+        }
+        
+        const savedGrid = localStorage.getItem('mapViewerShowGrid');
+        if (savedGrid !== null) {
+            showGrid = savedGrid === 'true';
+            console.log(`📊 Restored grid: ${showGrid ? 'ON' : 'OFF'}`);
+        }
+        
+        const savedCoordLabels = localStorage.getItem('mapViewerShowCoordLabels');
+        if (savedCoordLabels !== null) {
+            showCoordLabels = savedCoordLabels === 'true';
+            console.log(`🏷️ Restored coordinates: ${showCoordLabels ? 'ON' : 'OFF'}`);
+        }
+        
         // Setup canvas size
         console.log('📏 Setting up canvas size...');
         resizeCanvas();
@@ -182,6 +232,27 @@ async function init() {
         console.log('⌨️ Setting up keyboard controls...');
         setupKeyboardControls();
         console.log('✓ Keyboard controls ready');
+        
+        // Setup UI controls
+        console.log('🎛️ Setting up UI controls...');
+        setupUIControls();
+        console.log('✓ UI controls ready');
+        
+        // Restore sidebar state from localStorage
+        const sidebarHidden = localStorage.getItem('mapViewerSidebarHidden');
+        if (sidebarHidden === 'true') {
+            const sidebar = document.getElementById('sidebar');
+            const toggleBtn = document.getElementById('toggleSidebarBtn');
+            if (sidebar && toggleBtn) {
+                sidebar.classList.add('hidden');
+                toggleBtn.classList.remove('sidebar-visible');
+                toggleBtn.textContent = '☰';
+                console.log('📋 Restored sidebar state: HIDDEN');
+            }
+        }
+        
+        // Update zoom display with restored value
+        updateZoomDisplay();
         
         // Load map list
         console.log('📂 Loading map list...');
@@ -205,7 +276,9 @@ window.addEventListener('DOMContentLoaded', init);
 
 // Also try to initialize if DOM is already ready (for dynamic script loading)
 if (document.readyState === 'complete' || document.readyState === 'interactive') {
-    console.log('📌 DOM already ready, will initialize via manual trigger');
+    console.log('📌 DOM already ready, calling init immediately');
+    // Use setTimeout to ensure the script is fully loaded
+    setTimeout(() => init(), 0);
 }
 
 
@@ -556,8 +629,122 @@ function handleCanvasClick(e) {
                 // Navigate to the destination map
                 loadMap(clickedWarp.mapId);
             }
+            return; // Exit after handling warp
         }
     }
+    
+    // Check if we clicked on a sprite/NPC
+    if (currentMap.objects.sprites && currentMap.objects.sprites.data) {
+        const clickedSprite = currentMap.objects.sprites.data.find(sprite => 
+            sprite.x === romX && sprite.y === romY
+        );
+        
+        if (clickedSprite) {
+            console.log(`👤 Clicked on NPC:`, clickedSprite);
+            showSpriteDetails(clickedSprite, romX, romY);
+            return;
+        }
+    }
+    
+    // Check if we clicked on a sign
+    if (currentMap.objects.signs && currentMap.objects.signs.data) {
+        const clickedSign = currentMap.objects.signs.data.find(sign => 
+            sign.x === romX && sign.y === romY
+        );
+        
+        if (clickedSign) {
+            console.log(`📋 Clicked on sign:`, clickedSign);
+            showSignDetails(clickedSign, romX, romY);
+            return;
+        }
+    }
+}
+
+// Show detailed sprite/NPC information in a modal
+function showSpriteDetails(sprite, romX, romY) {
+    const movementTypes = {
+        0: 'Static',
+        1: 'Walk randomly',
+        2: 'Walk up/down',
+        3: 'Walk left/right',
+        254: 'Look around',
+        255: 'Stand still'
+    };
+    
+    const movementName = movementTypes[sprite.movement] || `Unknown (${sprite.movement})`;
+    
+    // Populate modal content
+    const modalContent = document.getElementById('npcModalContent');
+    modalContent.innerHTML = `
+        <div class="npc-info-item">
+            <span class="npc-info-label"><i class="bi bi-geo-alt"></i> Position (ROM):</span>
+            <span class="npc-info-value">(${romX}, ${romY})</span>
+        </div>
+        <div class="npc-info-item">
+            <span class="npc-info-label"><i class="bi bi-grid"></i> Position (Tile):</span>
+            <span class="npc-info-value">(${romX * 2}, ${romY * 2})</span>
+        </div>
+        <div class="npc-info-item">
+            <span class="npc-info-label"><i class="bi bi-image"></i> Picture ID:</span>
+            <span class="npc-info-value badge bg-primary">${sprite.pictureId}</span>
+        </div>
+        <div class="npc-info-item">
+            <span class="npc-info-label"><i class="bi bi-tag"></i> Type:</span>
+            <span class="npc-info-value badge bg-secondary">${sprite.type}</span>
+        </div>
+        <div class="npc-info-item">
+            <span class="npc-info-label"><i class="bi bi-arrows-move"></i> Movement:</span>
+            <span class="npc-info-value">${movementName} <span class="badge bg-info">${sprite.movement}</span></span>
+        </div>
+        <div class="npc-info-item">
+            <span class="npc-info-label"><i class="bi bi-chat-left-text"></i> Text ID:</span>
+            <span class="npc-info-value badge bg-success">${sprite.textId}</span>
+        </div>
+        <div class="alert alert-info mt-3 mb-0" role="alert">
+            <i class="bi bi-info-circle"></i> <small>In future versions, this will show the sprite graphic and allow editing movement patterns.</small>
+        </div>
+    `;
+    
+    // Show the modal
+    const modal = new bootstrap.Modal(document.getElementById('npcModal'));
+    modal.show();
+}
+
+// Show detailed sign information
+function showSignDetails(sign, romX, romY) {
+    // Populate modal content
+    const modalContent = document.getElementById('npcModalContent');
+    const modalTitle = document.getElementById('npcModalLabel');
+    
+    // Update modal title
+    modalTitle.innerHTML = '<i class="bi bi-sign-stop"></i> Sign Information';
+    
+    modalContent.innerHTML = `
+        <div class="npc-info-item">
+            <span class="npc-info-label"><i class="bi bi-geo-alt"></i> Position (ROM):</span>
+            <span class="npc-info-value">(${romX}, ${romY})</span>
+        </div>
+        <div class="npc-info-item">
+            <span class="npc-info-label"><i class="bi bi-grid"></i> Position (Tile):</span>
+            <span class="npc-info-value">(${romX * 2}, ${romY * 2})</span>
+        </div>
+        <div class="npc-info-item">
+            <span class="npc-info-label"><i class="bi bi-chat-left-text"></i> Text ID:</span>
+            <span class="npc-info-value badge bg-success">${sign.textId}</span>
+        </div>
+        <div class="alert alert-info mt-3 mb-0" role="alert">
+            <i class="bi bi-info-circle"></i> <small>In future versions, this will show the actual text content.</small>
+        </div>
+    `;
+    
+    // Show the modal
+    const modal = new bootstrap.Modal(document.getElementById('npcModal'));
+    modal.show();
+    
+    // Reset title when modal is hidden
+    document.getElementById('npcModal').addEventListener('hidden.bs.modal', function () {
+        modalTitle.innerHTML = '<i class="bi bi-person-circle"></i> NPC Information';
+    }, { once: true });
 }
 
 function setupKeyboardControls() {
@@ -598,10 +785,63 @@ function setupKeyboardControls() {
     });
 }
 
+function setupUIControls() {
+    // Sidebar toggle
+    const toggleBtn = document.getElementById('toggleSidebarBtn');
+    if (toggleBtn) {
+        toggleBtn.addEventListener('click', toggleSidebar);
+    }
+    
+    // Zoom controls
+    const zoomInBtn = document.getElementById('zoomInBtn');
+    const zoomOutBtn = document.getElementById('zoomOutBtn');
+    const resetZoomBtn = document.getElementById('resetZoomBtn');
+    
+    if (zoomInBtn) zoomInBtn.addEventListener('click', zoomIn);
+    if (zoomOutBtn) zoomOutBtn.addEventListener('click', zoomOut);
+    if (resetZoomBtn) resetZoomBtn.addEventListener('click', resetView);
+    
+    // Overlay toggles
+    const overlaysCheckbox = document.getElementById('showOverlaysCheckbox');
+    const gridCheckbox = document.getElementById('showGridCheckbox');
+    const coordsCheckbox = document.getElementById('showCoordsCheckbox');
+    
+    // Sync checkboxes with restored values
+    if (overlaysCheckbox) {
+        overlaysCheckbox.checked = showOverlays;
+        overlaysCheckbox.addEventListener('change', (e) => {
+            showOverlays = e.target.checked;
+            localStorage.setItem('mapViewerShowOverlays', showOverlays);
+            console.log(`🔄 Overlays: ${showOverlays ? 'ON' : 'OFF'} (saved)`);
+            renderMap();
+        });
+    }
+    
+    if (gridCheckbox) {
+        gridCheckbox.checked = showGrid;
+        gridCheckbox.addEventListener('change', (e) => {
+            showGrid = e.target.checked;
+            localStorage.setItem('mapViewerShowGrid', showGrid);
+            console.log(`📊 Grid: ${showGrid ? 'ON' : 'OFF'} (saved)`);
+            renderMap();
+        });
+    }
+    
+    if (coordsCheckbox) {
+        coordsCheckbox.checked = showCoordLabels;
+        coordsCheckbox.addEventListener('change', (e) => {
+            showCoordLabels = e.target.checked;
+            localStorage.setItem('mapViewerShowCoordLabels', showCoordLabels);
+            console.log(`🏷️ Coordinates: ${showCoordLabels ? 'ON' : 'OFF'} (saved)`);
+            renderMap();
+        });
+    }
+}
+
 async function loadMapList() {
     try {
-        console.log('📑 Fetching map index from ../map-data/map_index.json');
-        const response = await fetch('../map-data/map_index.json');
+        console.log('📑 Fetching map index from ../output/map-data/map_index.json');
+        const response = await fetch('../output/map-data/map_index.json');
         
         if (!response.ok) {
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -633,12 +873,31 @@ async function loadMapList() {
         // Update version footer with map count
         updateVersionFooter(data.maps.length);
         
-        // Load first map (Pallet Town)
-        if (towns.length > 0) {
-            console.log(`🗺️ Loading first map: ${towns[0].name} (ID: ${towns[0].mapId})`);
-            await loadMap(towns[0].mapId);
+        // Try to load saved map from localStorage, otherwise load first map (Pallet Town)
+        const savedMapId = localStorage.getItem('mapViewerCurrentMap');
+        let mapToLoad = null;
+        
+        if (savedMapId) {
+            const savedMapIdNum = parseInt(savedMapId, 10);
+            const savedMap = sortedMaps.find(m => m.mapId === savedMapIdNum);
+            if (savedMap) {
+                console.log(`📌 Restoring saved map: ${savedMap.name} (ID: ${savedMap.mapId})`);
+                mapToLoad = savedMap.mapId;
+            } else {
+                console.warn(`⚠️ Saved map ID ${savedMapId} not found in map list`);
+            }
+        }
+        
+        // Fallback to first town if no saved map
+        if (mapToLoad === null && towns.length > 0) {
+            console.log(`🗺️ Loading default map: ${towns[0].name} (ID: ${towns[0].mapId})`);
+            mapToLoad = towns[0].mapId;
+        }
+        
+        if (mapToLoad !== null) {
+            await loadMap(mapToLoad);
         } else {
-            console.warn('⚠️ No towns found to load');
+            console.warn('⚠️ No maps available to load');
         }
         
     } catch (error) {
@@ -691,7 +950,7 @@ async function loadMap(mapId) {
         
         // Load map data
         const mapFileName = await getMapFileName(mapId);
-        const mapFile = `../map-data/maps/${String(mapId).padStart(3, '0')}_${mapFileName}.json`;
+        const mapFile = `../output/map-data/maps/${String(mapId).padStart(3, '0')}_${mapFileName}.json`;
         console.log(`📄 Fetching map file: ${mapFile}`);
         
         const response = await fetch(mapFile);
@@ -740,6 +999,10 @@ async function loadMap(mapId) {
         mapDataCache[mapId] = mapData;
         currentMap = mapData;
         
+        // Save current map ID to localStorage
+        localStorage.setItem('mapViewerCurrentMap', mapId);
+        console.log(`💾 Saved map ${mapId} to localStorage`);
+        
         // Track last overworld map (maps with connections are overworld maps)
         // Check if this map has any connections (north, south, east, or west)
         const hasConnections = mapData.connections && (
@@ -773,14 +1036,39 @@ async function loadMap(mapId) {
             console.log(`✓ Block definitions for tileset ${mapData.tileset} already cached`);
         }
         
+        // Load overworld sprite metadata if not already loaded
+        if (!overworldSpriteData) {
+            console.log(`📋 Loading overworld sprite metadata...`);
+            try {
+                await loadOverworldSpriteMetadata();
+            } catch (error) {
+                console.warn(`⚠️ Failed to load sprite metadata:`, error.message);
+            }
+        }
+        
+        // Preload sprites used in this map
+        if (mapData.objects?.sprites?.data) {
+            console.log(`👤 Preloading ${mapData.objects.sprites.data.length} sprites for this map...`);
+            const spriteLoadPromises = mapData.objects.sprites.data.map(sprite => 
+                loadOverworldSprite(sprite.pictureId).catch(err => {
+                    console.warn(`  ⚠️ Failed to load sprite ${sprite.pictureId}:`, err);
+                    return null;
+                })
+            );
+            await Promise.all(spriteLoadPromises);
+            console.log(`✅ Sprites preloaded`);
+        }
+        
         // Update UI
         console.log('🔄 Updating UI...');
         updateMapInfo();
         updateActiveMapItem(mapId);
         
-        // Reset view and render
-        console.log('🎨 Rendering map...');
-        resetView();
+        // Center view without changing zoom (preserve user's zoom level)
+        console.log('🎨 Centering map view...');
+        offsetX = 50;
+        offsetY = 50;
+        renderMap();
         
         console.log(`✅ Map ${mapId} loaded and rendered successfully`);
         
@@ -794,7 +1082,7 @@ async function getMapFileName(mapId) {
     try {
         console.log(`  📇 Getting filename for map ${mapId}...`);
         // Load map index to get proper filename
-        const response = await fetch('../map-data/map_index.json');
+        const response = await fetch('../output/map-data/map_index.json');
         if (!response.ok) {
             throw new Error(`HTTP ${response.status}`);
         }
@@ -821,7 +1109,7 @@ async function loadTileset(tilesetId, tilesetName) {
         
         const img = new Image();
         const filename = `tileset_${String(tilesetId).padStart(2, '0')}_${tilesetName.replace(/\s+/g, '_')}.png`;
-        const imgPath = `../map-data/textures/${filename}`;
+        const imgPath = `../output/map-data/textures/${filename}`;
         
         console.log(`  📁 Tileset path: ${imgPath}`);
         img.src = imgPath;
@@ -848,7 +1136,7 @@ async function loadTilesetBlocks(tilesetId) {
     console.log(`  🔧 Loading block definitions for tileset ${tilesetId}...`);
     
     try {
-        const response = await fetch('../map-data/tilesets_complete.json');
+        const response = await fetch('../output/map-data/tilesets_complete.json');
         if (!response.ok) {
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
@@ -869,35 +1157,95 @@ async function loadTilesetBlocks(tilesetId) {
     }
 }
 
+// Load overworld sprite metadata
+async function loadOverworldSpriteMetadata() {
+    if (overworldSpriteData) {
+        console.log(`  ✓ Overworld sprite metadata already loaded`);
+        return overworldSpriteData;
+    }
+    
+    console.log(`  📋 Loading overworld sprite metadata...`);
+    
+    try {
+        const response = await fetch('../output/overworld-sprites/overworld_sprites.json');
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        overworldSpriteData = await response.json();
+        console.log(`  ✅ Loaded metadata for ${overworldSpriteData.sprites.length} sprites`);
+        return overworldSpriteData;
+    } catch (error) {
+        console.error(`  ❌ Failed to load sprite metadata:`, error.message);
+        throw error;
+    }
+}
+
+// Load a single overworld sprite image
+async function loadOverworldSprite(spriteId) {
+    if (overworldSprites[spriteId]) {
+        return overworldSprites[spriteId];
+    }
+    
+    return new Promise((resolve, reject) => {
+        // Load metadata first if not already loaded
+        if (!overworldSpriteData) {
+            loadOverworldSpriteMetadata()
+                .then(() => loadOverworldSprite(spriteId))
+                .then(resolve)
+                .catch(reject);
+            return;
+        }
+        
+        // Find sprite info in metadata
+        const spriteInfo = overworldSpriteData.sprites.find(s => s.id === spriteId);
+        if (!spriteInfo) {
+            console.warn(`  ⚠️ No metadata for sprite ID ${spriteId}`);
+            resolve(null);
+            return;
+        }
+        
+        const img = new Image();
+        const imgPath = `../output/overworld-sprites/${spriteInfo.filename}`;
+        
+        img.src = imgPath;
+        
+        img.onload = () => {
+            overworldSprites[spriteId] = img;
+            console.log(`  ✅ Loaded sprite ${spriteId}: ${spriteInfo.name} (${img.width}x${img.height})`);
+            resolve(img);
+        };
+        
+        img.onerror = (error) => {
+            console.warn(`  ⚠️ Failed to load sprite ${spriteId}: ${spriteInfo.filename}`, error);
+            overworldSprites[spriteId] = null;
+            resolve(null);
+        };
+    });
+}
+
 function updateMapInfo() {
     if (!currentMap) return;
     
-    document.getElementById('mapName').textContent = currentMap.name;
-    document.getElementById('mapId').textContent = currentMap.mapId;
-    document.getElementById('mapSize').textContent = `${currentMap.width}x${currentMap.height} blocks`;
-    document.getElementById('mapTileset').textContent = currentMap.tilesetName;
+    // Safely update elements if they exist
+    const mapNameEl = document.getElementById('mapName');
+    const mapIdEl = document.getElementById('mapId');
+    const mapSizeEl = document.getElementById('mapSize');
+    const tilesetNameEl = document.getElementById('tilesetName');
     
-    // Update metadata if available
-    if (currentMap.tileMetadata) {
-        const metadataInfo = document.getElementById('metadataInfo');
-        metadataInfo.style.display = 'block';
-        
-        const content = document.getElementById('metadataContent');
-        const summary = currentMap.tileMetadata.summary;
-        
-        content.innerHTML = `
-            <div class="info-row">Total Tiles: ${summary.totalTiles}</div>
-            <div class="info-row">Grass Coverage: ${summary.grassCoverage}</div>
-            <div class="info-row">Water Coverage: ${summary.waterCoverage}</div>
-            <div class="info-row">Walkable: ${summary.walkableCoverage}</div>
-            <div class="info-row">Grass Zones: ${summary.encounterZoneCount}</div>
-            <div class="info-row">Water Areas: ${summary.surfableAreaCount}</div>
-            <div class="info-row">Warp Tiles: ${currentMap.tileMetadata.warpTileCount}</div>
-            <div class="info-row">Ledges: ${currentMap.tileMetadata.ledgeTileCount}</div>
-        `;
-    } else {
-        document.getElementById('metadataInfo').style.display = 'none';
-    }
+    if (mapNameEl) mapNameEl.textContent = currentMap.name;
+    if (mapIdEl) mapIdEl.textContent = currentMap.mapId;
+    if (mapSizeEl) mapSizeEl.textContent = `${currentMap.width}x${currentMap.height} blocks`;
+    if (tilesetNameEl) tilesetNameEl.textContent = currentMap.tilesetName;
+    
+    // Update zoom level display
+    const zoomLevelEl = document.getElementById('zoomLevel');
+    if (zoomLevelEl) zoomLevelEl.textContent = `${scale}x`;
+}
+
+function updateZoomDisplay() {
+    const zoomLevelEl = document.getElementById('zoomLevel');
+    if (zoomLevelEl) zoomLevelEl.textContent = `${scale}x`;
 }
 
 function updateActiveMapItem(mapId) {
@@ -1136,7 +1484,62 @@ function renderMap() {
     console.log(`  🗺️ Current map: ${currentMap.name} (${currentMap.mapId})`);
     console.log(`  🖼️ Tileset: ${currentMap.tilesetName} (ID: ${currentMap.tileset}, Size: ${tilesetImg.width}x${tilesetImg.height})`);
     
-    // Draw object indicators AFTER all tiles (ROM coords are already in tile units)
+    // Draw sprites ALWAYS (not affected by overlay toggle)
+    if (currentMap.objects?.sprites?.data) {
+        console.log(`  🧍 Drawing overworld sprites...`);
+        for (const sprite of currentMap.objects.sprites.data) {
+            // ROM uses 1-based sprite IDs (1-72), our metadata uses 0-based (0-71)
+            // So pictureId 1 (RED in ROM) = sprite file 000_RED.png (id: 0)
+            const spriteFileId = sprite.pictureId - 1;
+            
+            // Skip invalid sprite IDs (like 255 = unused/disabled sprites)
+            if (spriteFileId > 71 || spriteFileId < 0) {
+                console.log(`  ⚠️ Skipping invalid sprite pictureId ${sprite.pictureId} at (${sprite.x}, ${sprite.y})`);
+                continue;
+            }
+            
+            const spriteImg = overworldSprites[spriteFileId];
+            
+            if (spriteImg && spriteImg.complete && spriteImg.naturalWidth > 0) {
+                // Draw actual sprite image
+                // Sprite image is 48x16 (3 frames: down, up, left at 16x16 each)
+                // Use the first frame (down) for now
+                const tileX = sprite.x * 2;
+                const tileY = sprite.y * 2;
+                const screenX = offsetX + tileX * TILE_SIZE * scale;
+                const screenY = offsetY + tileY * TILE_SIZE * scale;
+                const spriteSize = 2 * TILE_SIZE * scale; // 16x16 pixels scaled
+                
+                // Draw the sprite (first frame from sprite sheet)
+                ctx.drawImage(
+                    spriteImg,
+                    0, 0, 16, 16,  // Source: first frame (down direction)
+                    screenX, screenY, spriteSize, spriteSize  // Destination
+                );
+                
+                // Draw indicator overlay on top of sprite if overlays are enabled
+                if (showOverlays) {
+                    drawObjectIndicator(sprite.x, sprite.y, 'N', 'rgba(50, 255, 50, 0.36)', sprite.x, sprite.y);
+                }
+            } else {
+                // Fallback to indicator if sprite not loaded
+                drawObjectIndicator(sprite.x, sprite.y, 'N', 'rgba(50, 255, 50, 0.36)', sprite.x, sprite.y);
+                
+                // Try to load the sprite asynchronously
+                if (!overworldSprites[spriteFileId]) {
+                    loadOverworldSprite(spriteFileId).then(() => {
+                        // Re-render once sprite is loaded
+                        if (overworldSprites[spriteFileId]) {
+                            renderMap();
+                        }
+                    });
+                }
+            }
+        }
+        console.log(`  ✅ Drew ${currentMap.objects.sprites.data.length} sprites`);
+    }
+    
+    // Draw object overlays AFTER all tiles (ROM coords are already in tile units)
     if (showOverlays && currentMap.objects) {
         console.log(`  📍 Drawing object overlays...`);
         
@@ -1144,7 +1547,7 @@ function renderMap() {
         if (currentMap.objects.warps?.data) {
             currentMap.objects.warps.data.forEach(warp => {
                 // ROM coords are already in tile units, use directly
-                drawObjectIndicator(warp.x, warp.y, 'W', 'rgba(255, 50, 50, 0.6)', warp.x, warp.y);
+                drawObjectIndicator(warp.x, warp.y, 'W', 'rgba(255, 50, 50, 0.36)', warp.x, warp.y);
             });
             console.log(`  ✅ Drew ${currentMap.objects.warps.data.length} warps`);
         }
@@ -1152,17 +1555,9 @@ function renderMap() {
         // Draw signs
         if (currentMap.objects.signs?.data) {
             currentMap.objects.signs.data.forEach(sign => {
-                drawObjectIndicator(sign.x, sign.y, 'S', 'rgba(50, 150, 255, 0.6)', sign.x, sign.y);
+                drawObjectIndicator(sign.x, sign.y, 'S', 'rgba(50, 150, 255, 0.36)', sign.x, sign.y);
             });
             console.log(`  ✅ Drew ${currentMap.objects.signs.data.length} signs`);
-        }
-        
-        // Draw sprites
-        if (currentMap.objects.sprites?.data) {
-            currentMap.objects.sprites.data.forEach(sprite => {
-                drawObjectIndicator(sprite.x, sprite.y, 'N', 'rgba(50, 255, 50, 0.6)', sprite.x, sprite.y);
-            });
-            console.log(`  ✅ Drew ${currentMap.objects.sprites.data.length} sprites`);
         }
     }
     
@@ -1229,8 +1624,8 @@ function renderMap() {
     }
     
     // Draw grid (optional)
-    if (scale >= 4) {
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+    if (showGrid && scale >= 2) {
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
         ctx.lineWidth = 1;
         
         for (let x = startX; x <= endX; x++) {
@@ -1273,4 +1668,9 @@ function renderMap() {
 // Old renderOverlays function - NO LONGER USED
 // Overlays are now rendered inline during block rendering for perfect alignment
 // This ensures overlays match block positions exactly and scale properly
+
+
+
+
+
 

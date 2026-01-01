@@ -1,0 +1,1517 @@
+{
+  "extractionDate": "2026-01-01T01:32:44.053Z",
+  "spriteType": "front",
+  "totalSprites": 151,
+  "sprites": [
+    {
+      "pokedexNumber": 1,
+      "indexNumber": 153,
+      "name": "BULBASAUR",
+      "spriteType": "front",
+      "width": 40,
+      "height": 40,
+      "offset": "0x34000",
+      "filename": "001_BULBASAUR.png"
+    },
+    {
+      "pokedexNumber": 2,
+      "indexNumber": 9,
+      "name": "IVYSAUR",
+      "spriteType": "front",
+      "width": 48,
+      "height": 48,
+      "offset": "0x2502B",
+      "filename": "002_IVYSAUR.png"
+    },
+    {
+      "pokedexNumber": 3,
+      "indexNumber": 154,
+      "name": "VENUSAUR",
+      "spriteType": "front",
+      "width": 56,
+      "height": 56,
+      "offset": "0x34162",
+      "filename": "003_VENUSAUR.png"
+    },
+    {
+      "pokedexNumber": 4,
+      "indexNumber": 176,
+      "name": "CHARMANDER",
+      "spriteType": "front",
+      "width": 40,
+      "height": 40,
+      "offset": "0x35C5C",
+      "filename": "004_CHARMANDER.png"
+    },
+    {
+      "pokedexNumber": 5,
+      "indexNumber": 178,
+      "name": "CHARMELEON",
+      "spriteType": "front",
+      "width": 48,
+      "height": 48,
+      "offset": "0x35F0C",
+      "filename": "005_CHARMELEON.png"
+    },
+    {
+      "pokedexNumber": 6,
+      "indexNumber": 180,
+      "name": "CHARIZARD",
+      "spriteType": "front",
+      "width": 56,
+      "height": 56,
+      "offset": "0x36286",
+      "filename": "006_CHARIZARD.png"
+    },
+    {
+      "pokedexNumber": 7,
+      "indexNumber": 177,
+      "name": "SQUIRTLE",
+      "spriteType": "front",
+      "width": 40,
+      "height": 40,
+      "offset": "0x35DB8",
+      "filename": "007_SQUIRTLE.png"
+    },
+    {
+      "pokedexNumber": 8,
+      "indexNumber": 179,
+      "name": "WARTORTLE",
+      "spriteType": "front",
+      "width": 48,
+      "height": 48,
+      "offset": "0x360B1",
+      "filename": "008_WARTORTLE.png"
+    },
+    {
+      "pokedexNumber": 9,
+      "indexNumber": 28,
+      "name": "BLASTOISE",
+      "spriteType": "front",
+      "width": 56,
+      "height": 56,
+      "offset": "0x27637",
+      "filename": "009_BLASTOISE.png"
+    },
+    {
+      "pokedexNumber": 10,
+      "indexNumber": 123,
+      "name": "CATERPIE",
+      "spriteType": "front",
+      "width": 40,
+      "height": 40,
+      "offset": "0x30A49",
+      "filename": "010_CATERPIE.png"
+    },
+    {
+      "pokedexNumber": 11,
+      "indexNumber": 124,
+      "name": "METAPOD",
+      "spriteType": "front",
+      "width": 40,
+      "height": 40,
+      "offset": "0x30B3A",
+      "filename": "011_METAPOD.png"
+    },
+    {
+      "pokedexNumber": 12,
+      "indexNumber": 125,
+      "name": "BUTTERFREE",
+      "spriteType": "front",
+      "width": 56,
+      "height": 56,
+      "offset": "0x30C37",
+      "filename": "012_BUTTERFREE.png"
+    },
+    {
+      "pokedexNumber": 13,
+      "indexNumber": 112,
+      "name": "WEEDLE",
+      "spriteType": "front",
+      "width": 40,
+      "height": 40,
+      "offset": "0x2F57D",
+      "filename": "013_WEEDLE.png"
+    },
+    {
+      "pokedexNumber": 14,
+      "indexNumber": 113,
+      "name": "KAKUNA",
+      "spriteType": "front",
+      "width": 40,
+      "height": 40,
+      "offset": "0x2F677",
+      "filename": "014_KAKUNA.png"
+    },
+    {
+      "pokedexNumber": 15,
+      "indexNumber": 114,
+      "name": "BEEDRILL",
+      "spriteType": "front",
+      "width": 56,
+      "height": 56,
+      "offset": "0x2F788",
+      "filename": "015_BEEDRILL.png"
+    },
+    {
+      "pokedexNumber": 16,
+      "indexNumber": 36,
+      "name": "PIDGEY",
+      "spriteType": "front",
+      "width": 40,
+      "height": 40,
+      "offset": "0x285A7",
+      "filename": "016_PIDGEY.png"
+    },
+    {
+      "pokedexNumber": 17,
+      "indexNumber": 150,
+      "name": "PIDGEOTTO",
+      "spriteType": "front",
+      "width": 48,
+      "height": 48,
+      "offset": "0x3380A",
+      "filename": "017_PIDGEOTTO.png"
+    },
+    {
+      "pokedexNumber": 18,
+      "indexNumber": 151,
+      "name": "PIDGEOT",
+      "spriteType": "front",
+      "width": 56,
+      "height": 56,
+      "offset": "0x339C2",
+      "filename": "018_PIDGEOT.png"
+    },
+    {
+      "pokedexNumber": 19,
+      "indexNumber": 165,
+      "name": "RATTATA",
+      "spriteType": "front",
+      "width": 40,
+      "height": 40,
+      "offset": "0x34F6A",
+      "filename": "019_RATTATA.png"
+    },
+    {
+      "pokedexNumber": 20,
+      "indexNumber": 166,
+      "name": "RATICATE",
+      "spriteType": "front",
+      "width": 48,
+      "height": 48,
+      "offset": "0x3507A",
+      "filename": "020_RATICATE.png"
+    },
+    {
+      "pokedexNumber": 21,
+      "indexNumber": 5,
+      "name": "SPEAROW",
+      "spriteType": "front",
+      "width": 40,
+      "height": 40,
+      "offset": "0x247DF",
+      "filename": "021_SPEAROW.png"
+    },
+    {
+      "pokedexNumber": 22,
+      "indexNumber": 35,
+      "name": "FEAROW",
+      "spriteType": "front",
+      "width": 56,
+      "height": 56,
+      "offset": "0x28383",
+      "filename": "022_FEAROW.png"
+    },
+    {
+      "pokedexNumber": 23,
+      "indexNumber": 108,
+      "name": "EKANS",
+      "spriteType": "front",
+      "width": 40,
+      "height": 40,
+      "offset": "0x2EF6B",
+      "filename": "023_EKANS.png"
+    },
+    {
+      "pokedexNumber": 24,
+      "indexNumber": 45,
+      "name": "ARBOK",
+      "spriteType": "front",
+      "width": 56,
+      "height": 56,
+      "offset": "0x296B4",
+      "filename": "024_ARBOK.png"
+    },
+    {
+      "pokedexNumber": 25,
+      "indexNumber": 84,
+      "name": "PIKACHU",
+      "spriteType": "front",
+      "width": 40,
+      "height": 40,
+      "offset": "0x2CD7D",
+      "filename": "025_PIKACHU.png"
+    },
+    {
+      "pokedexNumber": 26,
+      "indexNumber": 85,
+      "name": "RAICHU",
+      "spriteType": "front",
+      "width": 56,
+      "height": 56,
+      "offset": "0x2CF03",
+      "filename": "026_RAICHU.png"
+    },
+    {
+      "pokedexNumber": 27,
+      "indexNumber": 96,
+      "name": "SANDSHREW",
+      "spriteType": "front",
+      "width": 40,
+      "height": 40,
+      "offset": "0x2DAC9",
+      "filename": "027_SANDSHREW.png"
+    },
+    {
+      "pokedexNumber": 28,
+      "indexNumber": 97,
+      "name": "SANDSLASH",
+      "spriteType": "front",
+      "width": 48,
+      "height": 48,
+      "offset": "0x2DC6B",
+      "filename": "028_SANDSLASH.png"
+    },
+    {
+      "pokedexNumber": 29,
+      "indexNumber": 15,
+      "name": "NIDORANF",
+      "spriteType": "front",
+      "width": 40,
+      "height": 40,
+      "offset": "0x25D28",
+      "filename": "029_NIDORANF.png"
+    },
+    {
+      "pokedexNumber": 30,
+      "indexNumber": 168,
+      "name": "NIDORINA",
+      "spriteType": "front",
+      "width": 48,
+      "height": 48,
+      "offset": "0x3548B",
+      "filename": "030_NIDORINA.png"
+    },
+    {
+      "pokedexNumber": 31,
+      "indexNumber": 16,
+      "name": "NIDOQUEEN",
+      "spriteType": "front",
+      "width": 56,
+      "height": 56,
+      "offset": "0x25E09",
+      "filename": "031_NIDOQUEEN.png"
+    },
+    {
+      "pokedexNumber": 32,
+      "indexNumber": 3,
+      "name": "NIDORANM",
+      "spriteType": "front",
+      "width": 40,
+      "height": 40,
+      "offset": "0x2453C",
+      "filename": "032_NIDORANM.png"
+    },
+    {
+      "pokedexNumber": 33,
+      "indexNumber": 167,
+      "name": "NIDORINO",
+      "spriteType": "front",
+      "width": 48,
+      "height": 48,
+      "offset": "0x35282",
+      "filename": "033_NIDORINO.png"
+    },
+    {
+      "pokedexNumber": 34,
+      "indexNumber": 7,
+      "name": "NIDOKING",
+      "spriteType": "front",
+      "width": 56,
+      "height": 56,
+      "offset": "0x249F8",
+      "filename": "034_NIDOKING.png"
+    },
+    {
+      "pokedexNumber": 35,
+      "indexNumber": 4,
+      "name": "CLEFAIRY",
+      "spriteType": "front",
+      "width": 40,
+      "height": 40,
+      "offset": "0x24682",
+      "filename": "035_CLEFAIRY.png"
+    },
+    {
+      "pokedexNumber": 36,
+      "indexNumber": 142,
+      "name": "CLEFABLE",
+      "spriteType": "front",
+      "width": 48,
+      "height": 48,
+      "offset": "0x3288C",
+      "filename": "036_CLEFABLE.png"
+    },
+    {
+      "pokedexNumber": 37,
+      "indexNumber": 82,
+      "name": "VULPIX",
+      "spriteType": "front",
+      "width": 48,
+      "height": 48,
+      "offset": "0x2C924",
+      "filename": "037_VULPIX.png"
+    },
+    {
+      "pokedexNumber": 38,
+      "indexNumber": 83,
+      "name": "NINETALES",
+      "spriteType": "front",
+      "width": 56,
+      "height": 56,
+      "offset": "0x2CAFF",
+      "filename": "038_NINETALES.png"
+    },
+    {
+      "pokedexNumber": 39,
+      "indexNumber": 100,
+      "name": "JIGGLYPUFF",
+      "spriteType": "front",
+      "width": 40,
+      "height": 40,
+      "offset": "0x2E22F",
+      "filename": "039_JIGGLYPUFF.png"
+    },
+    {
+      "pokedexNumber": 40,
+      "indexNumber": 101,
+      "name": "WIGGLYTUFF",
+      "spriteType": "front",
+      "width": 48,
+      "height": 48,
+      "offset": "0x2E348",
+      "filename": "040_WIGGLYTUFF.png"
+    },
+    {
+      "pokedexNumber": 41,
+      "indexNumber": 107,
+      "name": "ZUBAT",
+      "spriteType": "front",
+      "width": 40,
+      "height": 40,
+      "offset": "0x2EE0C",
+      "filename": "041_ZUBAT.png"
+    },
+    {
+      "pokedexNumber": 42,
+      "indexNumber": 130,
+      "name": "GOLBAT",
+      "spriteType": "front",
+      "width": 56,
+      "height": 56,
+      "offset": "0x315E0",
+      "filename": "042_GOLBAT.png"
+    },
+    {
+      "pokedexNumber": 43,
+      "indexNumber": 185,
+      "name": "ODDISH",
+      "spriteType": "front",
+      "width": 40,
+      "height": 40,
+      "offset": "0x3680B",
+      "filename": "043_ODDISH.png"
+    },
+    {
+      "pokedexNumber": 44,
+      "indexNumber": 186,
+      "name": "GLOOM",
+      "spriteType": "front",
+      "width": 48,
+      "height": 48,
+      "offset": "0x36941",
+      "filename": "044_GLOOM.png"
+    },
+    {
+      "pokedexNumber": 45,
+      "indexNumber": 187,
+      "name": "VILEPLUME",
+      "spriteType": "front",
+      "width": 56,
+      "height": 56,
+      "offset": "0x36B21",
+      "filename": "045_VILEPLUME.png"
+    },
+    {
+      "pokedexNumber": 46,
+      "indexNumber": 109,
+      "name": "PARAS",
+      "spriteType": "front",
+      "width": 40,
+      "height": 40,
+      "offset": "0x2F0B4",
+      "filename": "046_PARAS.png"
+    },
+    {
+      "pokedexNumber": 47,
+      "indexNumber": 46,
+      "name": "PARASECT",
+      "spriteType": "front",
+      "width": 56,
+      "height": 56,
+      "offset": "0x299A8",
+      "filename": "047_PARASECT.png"
+    },
+    {
+      "pokedexNumber": 48,
+      "indexNumber": 65,
+      "name": "VENONAT",
+      "spriteType": "front",
+      "width": 40,
+      "height": 40,
+      "offset": "0x2B357",
+      "filename": "048_VENONAT.png"
+    },
+    {
+      "pokedexNumber": 49,
+      "indexNumber": 119,
+      "name": "VENOMOTH",
+      "spriteType": "front",
+      "width": 56,
+      "height": 56,
+      "offset": "0x306A9",
+      "filename": "049_VENOMOTH.png"
+    },
+    {
+      "pokedexNumber": 50,
+      "indexNumber": 59,
+      "name": "DIGLETT",
+      "spriteType": "front",
+      "width": 40,
+      "height": 40,
+      "offset": "0x2AD33",
+      "filename": "050_DIGLETT.png"
+    },
+    {
+      "pokedexNumber": 51,
+      "indexNumber": 118,
+      "name": "DUGTRIO",
+      "spriteType": "front",
+      "width": 48,
+      "height": 48,
+      "offset": "0x30480",
+      "filename": "051_DUGTRIO.png"
+    },
+    {
+      "pokedexNumber": 52,
+      "indexNumber": 77,
+      "name": "MEOWTH",
+      "spriteType": "front",
+      "width": 40,
+      "height": 40,
+      "offset": "0x2C609",
+      "filename": "052_MEOWTH.png"
+    },
+    {
+      "pokedexNumber": 53,
+      "indexNumber": 144,
+      "name": "PERSIAN",
+      "spriteType": "front",
+      "width": 56,
+      "height": 56,
+      "offset": "0x32D1E",
+      "filename": "053_PERSIAN.png"
+    },
+    {
+      "pokedexNumber": 54,
+      "indexNumber": 47,
+      "name": "PSYDUCK",
+      "spriteType": "front",
+      "width": 40,
+      "height": 40,
+      "offset": "0x29C0A",
+      "filename": "054_PSYDUCK.png"
+    },
+    {
+      "pokedexNumber": 55,
+      "indexNumber": 128,
+      "name": "GOLDUCK",
+      "spriteType": "front",
+      "width": 56,
+      "height": 56,
+      "offset": "0x31108",
+      "filename": "055_GOLDUCK.png"
+    },
+    {
+      "pokedexNumber": 56,
+      "indexNumber": 57,
+      "name": "MANKEY",
+      "spriteType": "front",
+      "width": 40,
+      "height": 40,
+      "offset": "0x2AA11",
+      "filename": "056_MANKEY.png"
+    },
+    {
+      "pokedexNumber": 57,
+      "indexNumber": 117,
+      "name": "PRIMEAPE",
+      "spriteType": "front",
+      "width": 56,
+      "height": 56,
+      "offset": "0x30247",
+      "filename": "057_PRIMEAPE.png"
+    },
+    {
+      "pokedexNumber": 58,
+      "indexNumber": 33,
+      "name": "GROWLITHE",
+      "spriteType": "front",
+      "width": 40,
+      "height": 40,
+      "offset": "0x28000",
+      "filename": "058_GROWLITHE.png"
+    },
+    {
+      "pokedexNumber": 59,
+      "indexNumber": 20,
+      "name": "ARCANINE",
+      "spriteType": "front",
+      "width": 56,
+      "height": 56,
+      "offset": "0x266FF",
+      "filename": "059_ARCANINE.png"
+    },
+    {
+      "pokedexNumber": 60,
+      "indexNumber": 71,
+      "name": "POLIWAG",
+      "spriteType": "front",
+      "width": 40,
+      "height": 40,
+      "offset": "0x2B875",
+      "filename": "060_POLIWAG.png"
+    },
+    {
+      "pokedexNumber": 61,
+      "indexNumber": 110,
+      "name": "POLIWHIRL",
+      "spriteType": "front",
+      "width": 48,
+      "height": 48,
+      "offset": "0x2F1ED",
+      "filename": "061_POLIWHIRL.png"
+    },
+    {
+      "pokedexNumber": 62,
+      "indexNumber": 111,
+      "name": "POLIWRATH",
+      "spriteType": "front",
+      "width": 56,
+      "height": 56,
+      "offset": "0x2F3C1",
+      "filename": "062_POLIWRATH.png"
+    },
+    {
+      "pokedexNumber": 63,
+      "indexNumber": 148,
+      "name": "ABRA",
+      "spriteType": "front",
+      "width": 40,
+      "height": 40,
+      "offset": "0x333CC",
+      "filename": "063_ABRA.png"
+    },
+    {
+      "pokedexNumber": 64,
+      "indexNumber": 38,
+      "name": "KADABRA",
+      "spriteType": "front",
+      "width": 48,
+      "height": 48,
+      "offset": "0x28830",
+      "filename": "064_KADABRA.png"
+    },
+    {
+      "pokedexNumber": 65,
+      "indexNumber": 149,
+      "name": "ALAKAZAM",
+      "spriteType": "front",
+      "width": 56,
+      "height": 56,
+      "offset": "0x3355A",
+      "filename": "065_ALAKAZAM.png"
+    },
+    {
+      "pokedexNumber": 66,
+      "indexNumber": 106,
+      "name": "MACHOP",
+      "spriteType": "front",
+      "width": 40,
+      "height": 40,
+      "offset": "0x2EC9F",
+      "filename": "066_MACHOP.png"
+    },
+    {
+      "pokedexNumber": 67,
+      "indexNumber": 41,
+      "name": "MACHOKE",
+      "spriteType": "front",
+      "width": 56,
+      "height": 56,
+      "offset": "0x28E85",
+      "filename": "067_MACHOKE.png"
+    },
+    {
+      "pokedexNumber": 68,
+      "indexNumber": 126,
+      "name": "MACHAMP",
+      "spriteType": "front",
+      "width": 56,
+      "height": 56,
+      "offset": "0x30E93",
+      "filename": "068_MACHAMP.png"
+    },
+    {
+      "pokedexNumber": 69,
+      "indexNumber": 188,
+      "name": "BELLSPROUT",
+      "spriteType": "front",
+      "width": 40,
+      "height": 40,
+      "offset": "0x36D00",
+      "filename": "069_BELLSPROUT.png"
+    },
+    {
+      "pokedexNumber": 70,
+      "indexNumber": 189,
+      "name": "WEEPINBELL",
+      "spriteType": "front",
+      "width": 48,
+      "height": 48,
+      "offset": "0x36E30",
+      "filename": "070_WEEPINBELL.png"
+    },
+    {
+      "pokedexNumber": 71,
+      "indexNumber": 190,
+      "name": "VICTREEBEL",
+      "spriteType": "front",
+      "width": 56,
+      "height": 56,
+      "offset": "0x36FEA",
+      "filename": "071_VICTREEBEL.png"
+    },
+    {
+      "pokedexNumber": 72,
+      "indexNumber": 24,
+      "name": "TENTACOOL",
+      "spriteType": "front",
+      "width": 40,
+      "height": 40,
+      "offset": "0x26E2A",
+      "filename": "072_TENTACOOL.png"
+    },
+    {
+      "pokedexNumber": 73,
+      "indexNumber": 155,
+      "name": "TENTACRUEL",
+      "spriteType": "front",
+      "width": 48,
+      "height": 48,
+      "offset": "0x34455",
+      "filename": "073_TENTACRUEL.png"
+    },
+    {
+      "pokedexNumber": 74,
+      "indexNumber": 169,
+      "name": "GEODUDE",
+      "spriteType": "front",
+      "width": 40,
+      "height": 40,
+      "offset": "0x3564F",
+      "filename": "074_GEODUDE.png"
+    },
+    {
+      "pokedexNumber": 75,
+      "indexNumber": 39,
+      "name": "GRAVELER",
+      "spriteType": "front",
+      "width": 48,
+      "height": 48,
+      "offset": "0x28A4C",
+      "filename": "075_GRAVELER.png"
+    },
+    {
+      "pokedexNumber": 76,
+      "indexNumber": 49,
+      "name": "GOLEM",
+      "spriteType": "front",
+      "width": 48,
+      "height": 48,
+      "offset": "0x29F74",
+      "filename": "076_GOLEM.png"
+    },
+    {
+      "pokedexNumber": 77,
+      "indexNumber": 163,
+      "name": "PONYTA",
+      "spriteType": "front",
+      "width": 48,
+      "height": 48,
+      "offset": "0x34AB1",
+      "filename": "077_PONYTA.png"
+    },
+    {
+      "pokedexNumber": 78,
+      "indexNumber": 164,
+      "name": "RAPIDASH",
+      "spriteType": "front",
+      "width": 56,
+      "height": 56,
+      "offset": "0x34C10",
+      "filename": "078_RAPIDASH.png"
+    },
+    {
+      "pokedexNumber": 79,
+      "indexNumber": 37,
+      "name": "SLOWPOKE",
+      "spriteType": "front",
+      "width": 40,
+      "height": 40,
+      "offset": "0x286A0",
+      "filename": "079_SLOWPOKE.png"
+    },
+    {
+      "pokedexNumber": 80,
+      "indexNumber": 8,
+      "name": "SLOWBRO",
+      "spriteType": "front",
+      "width": 56,
+      "height": 56,
+      "offset": "0x24D0A",
+      "filename": "080_SLOWBRO.png"
+    },
+    {
+      "pokedexNumber": 81,
+      "indexNumber": 173,
+      "name": "MAGNEMITE",
+      "spriteType": "front",
+      "width": 40,
+      "height": 40,
+      "offset": "0x35B87",
+      "filename": "081_MAGNEMITE.png"
+    },
+    {
+      "pokedexNumber": 82,
+      "indexNumber": 54,
+      "name": "MAGNETON",
+      "spriteType": "front",
+      "width": 48,
+      "height": 48,
+      "offset": "0x2A588",
+      "filename": "082_MAGNETON.png"
+    },
+    {
+      "pokedexNumber": 83,
+      "indexNumber": 64,
+      "name": "FARFETCH'D",
+      "spriteType": "front",
+      "width": 48,
+      "height": 48,
+      "offset": "0x2B0E9",
+      "filename": "083_FARFETCH'D.png"
+    },
+    {
+      "pokedexNumber": 84,
+      "indexNumber": 70,
+      "name": "DODUO",
+      "spriteType": "front",
+      "width": 40,
+      "height": 40,
+      "offset": "0x2B72C",
+      "filename": "084_DODUO.png"
+    },
+    {
+      "pokedexNumber": 85,
+      "indexNumber": 116,
+      "name": "DODRIO",
+      "spriteType": "front",
+      "width": 56,
+      "height": 56,
+      "offset": "0x30000",
+      "filename": "085_DODRIO.png"
+    },
+    {
+      "pokedexNumber": 86,
+      "indexNumber": 58,
+      "name": "SEEL",
+      "spriteType": "front",
+      "width": 48,
+      "height": 48,
+      "offset": "0x2AB84",
+      "filename": "086_SEEL.png"
+    },
+    {
+      "pokedexNumber": 87,
+      "indexNumber": 120,
+      "name": "DEWGONG",
+      "spriteType": "front",
+      "width": 48,
+      "height": 48,
+      "offset": "0x30899",
+      "filename": "087_DEWGONG.png"
+    },
+    {
+      "pokedexNumber": 88,
+      "indexNumber": 13,
+      "name": "GRIMER",
+      "spriteType": "front",
+      "width": 40,
+      "height": 40,
+      "offset": "0x25973",
+      "filename": "088_GRIMER.png"
+    },
+    {
+      "pokedexNumber": 89,
+      "indexNumber": 136,
+      "name": "MUK",
+      "spriteType": "front",
+      "width": 56,
+      "height": 56,
+      "offset": "0x31F56",
+      "filename": "089_MUK.png"
+    },
+    {
+      "pokedexNumber": 90,
+      "indexNumber": 23,
+      "name": "SHELLDER",
+      "spriteType": "front",
+      "width": 40,
+      "height": 40,
+      "offset": "0x26CB6",
+      "filename": "090_SHELLDER.png"
+    },
+    {
+      "pokedexNumber": 91,
+      "indexNumber": 139,
+      "name": "CLOYSTER",
+      "spriteType": "front",
+      "width": 56,
+      "height": 56,
+      "offset": "0x3247F",
+      "filename": "091_CLOYSTER.png"
+    },
+    {
+      "pokedexNumber": 92,
+      "indexNumber": 25,
+      "name": "GASTLY",
+      "spriteType": "front",
+      "width": 56,
+      "height": 56,
+      "offset": "0x26F77",
+      "filename": "092_GASTLY.png"
+    },
+    {
+      "pokedexNumber": 93,
+      "indexNumber": 147,
+      "name": "HAUNTER",
+      "spriteType": "front",
+      "width": 48,
+      "height": 48,
+      "offset": "0x3318A",
+      "filename": "093_HAUNTER.png"
+    },
+    {
+      "pokedexNumber": 94,
+      "indexNumber": 14,
+      "name": "GENGAR",
+      "spriteType": "front",
+      "width": 48,
+      "height": 48,
+      "offset": "0x25B76",
+      "filename": "094_GENGAR.png"
+    },
+    {
+      "pokedexNumber": 95,
+      "indexNumber": 34,
+      "name": "ONIX",
+      "spriteType": "front",
+      "width": 56,
+      "height": 56,
+      "offset": "0x28164",
+      "filename": "095_ONIX.png"
+    },
+    {
+      "pokedexNumber": 96,
+      "indexNumber": 48,
+      "name": "DROWZEE",
+      "spriteType": "front",
+      "width": 48,
+      "height": 48,
+      "offset": "0x29DA9",
+      "filename": "096_DROWZEE.png"
+    },
+    {
+      "pokedexNumber": 97,
+      "indexNumber": 129,
+      "name": "HYPNO",
+      "spriteType": "front",
+      "width": 56,
+      "height": 56,
+      "offset": "0x3135D",
+      "filename": "097_HYPNO.png"
+    },
+    {
+      "pokedexNumber": 98,
+      "indexNumber": 78,
+      "name": "KRABBY",
+      "spriteType": "front",
+      "width": 40,
+      "height": 40,
+      "offset": "0x2C777",
+      "filename": "098_KRABBY.png"
+    },
+    {
+      "pokedexNumber": 99,
+      "indexNumber": 138,
+      "name": "KINGLER",
+      "spriteType": "front",
+      "width": 56,
+      "height": 56,
+      "offset": "0x321EC",
+      "filename": "099_KINGLER.png"
+    },
+    {
+      "pokedexNumber": 100,
+      "indexNumber": 6,
+      "name": "VOLTORB",
+      "spriteType": "front",
+      "width": 40,
+      "height": 40,
+      "offset": "0x24911",
+      "filename": "100_VOLTORB.png"
+    },
+    {
+      "pokedexNumber": 101,
+      "indexNumber": 141,
+      "name": "ELECTRODE",
+      "spriteType": "front",
+      "width": 40,
+      "height": 40,
+      "offset": "0x32760",
+      "filename": "101_ELECTRODE.png"
+    },
+    {
+      "pokedexNumber": 102,
+      "indexNumber": 12,
+      "name": "EXEGGCUTE",
+      "spriteType": "front",
+      "width": 56,
+      "height": 56,
+      "offset": "0x256D7",
+      "filename": "102_EXEGGCUTE.png"
+    },
+    {
+      "pokedexNumber": 103,
+      "indexNumber": 10,
+      "name": "EXEGGUTOR",
+      "spriteType": "front",
+      "width": 56,
+      "height": 56,
+      "offset": "0x251D6",
+      "filename": "103_EXEGGUTOR.png"
+    },
+    {
+      "pokedexNumber": 104,
+      "indexNumber": 17,
+      "name": "CUBONE",
+      "spriteType": "front",
+      "width": 40,
+      "height": 40,
+      "offset": "0x260A8",
+      "filename": "104_CUBONE.png"
+    },
+    {
+      "pokedexNumber": 105,
+      "indexNumber": 145,
+      "name": "MAROWAK",
+      "spriteType": "front",
+      "width": 48,
+      "height": 48,
+      "offset": "0x32F8F",
+      "filename": "105_MAROWAK.png"
+    },
+    {
+      "pokedexNumber": 106,
+      "indexNumber": 43,
+      "name": "HITMONLEE",
+      "spriteType": "front",
+      "width": 56,
+      "height": 56,
+      "offset": "0x292BF",
+      "filename": "106_HITMONLEE.png"
+    },
+    {
+      "pokedexNumber": 107,
+      "indexNumber": 44,
+      "name": "HITMONCHAN",
+      "spriteType": "front",
+      "width": 48,
+      "height": 48,
+      "offset": "0x294BC",
+      "filename": "107_HITMONCHAN.png"
+    },
+    {
+      "pokedexNumber": 108,
+      "indexNumber": 11,
+      "name": "LICKITUNG",
+      "spriteType": "front",
+      "width": 56,
+      "height": 56,
+      "offset": "0x254A7",
+      "filename": "108_LICKITUNG.png"
+    },
+    {
+      "pokedexNumber": 109,
+      "indexNumber": 55,
+      "name": "KOFFING",
+      "spriteType": "front",
+      "width": 48,
+      "height": 48,
+      "offset": "0x2A7A6",
+      "filename": "109_KOFFING.png"
+    },
+    {
+      "pokedexNumber": 110,
+      "indexNumber": 143,
+      "name": "WEEZING",
+      "spriteType": "front",
+      "width": 56,
+      "height": 56,
+      "offset": "0x32A44",
+      "filename": "110_WEEZING.png"
+    },
+    {
+      "pokedexNumber": 111,
+      "indexNumber": 18,
+      "name": "RHYHORN",
+      "spriteType": "front",
+      "width": 56,
+      "height": 56,
+      "offset": "0x26208",
+      "filename": "111_RHYHORN.png"
+    },
+    {
+      "pokedexNumber": 112,
+      "indexNumber": 1,
+      "name": "RHYDON",
+      "spriteType": "front",
+      "width": 56,
+      "height": 56,
+      "offset": "0x24000",
+      "filename": "112_RHYDON.png"
+    },
+    {
+      "pokedexNumber": 113,
+      "indexNumber": 40,
+      "name": "CHANSEY",
+      "spriteType": "front",
+      "width": 48,
+      "height": 48,
+      "offset": "0x28CAE",
+      "filename": "113_CHANSEY.png"
+    },
+    {
+      "pokedexNumber": 114,
+      "indexNumber": 30,
+      "name": "TANGELA",
+      "spriteType": "front",
+      "width": 48,
+      "height": 48,
+      "offset": "0x27B39",
+      "filename": "114_TANGELA.png"
+    },
+    {
+      "pokedexNumber": 115,
+      "indexNumber": 2,
+      "name": "KANGASKHAN",
+      "spriteType": "front",
+      "width": 56,
+      "height": 56,
+      "offset": "0x2429A",
+      "filename": "115_KANGASKHAN.png"
+    },
+    {
+      "pokedexNumber": 116,
+      "indexNumber": 92,
+      "name": "HORSEA",
+      "spriteType": "front",
+      "width": 40,
+      "height": 40,
+      "offset": "0x2D7C1",
+      "filename": "116_HORSEA.png"
+    },
+    {
+      "pokedexNumber": 117,
+      "indexNumber": 93,
+      "name": "SEADRA",
+      "spriteType": "front",
+      "width": 48,
+      "height": 48,
+      "offset": "0x2D8C4",
+      "filename": "117_SEADRA.png"
+    },
+    {
+      "pokedexNumber": 118,
+      "indexNumber": 157,
+      "name": "GOLDEEN",
+      "spriteType": "front",
+      "width": 48,
+      "height": 48,
+      "offset": "0x3466F",
+      "filename": "118_GOLDEEN.png"
+    },
+    {
+      "pokedexNumber": 119,
+      "indexNumber": 158,
+      "name": "SEAKING",
+      "spriteType": "front",
+      "width": 56,
+      "height": 56,
+      "offset": "0x34803",
+      "filename": "119_SEAKING.png"
+    },
+    {
+      "pokedexNumber": 120,
+      "indexNumber": 27,
+      "name": "STARYU",
+      "spriteType": "front",
+      "width": 48,
+      "height": 48,
+      "offset": "0x274E0",
+      "filename": "120_STARYU.png"
+    },
+    {
+      "pokedexNumber": 121,
+      "indexNumber": 152,
+      "name": "STARMIE",
+      "spriteType": "front",
+      "width": 48,
+      "height": 48,
+      "offset": "0x33C1C",
+      "filename": "121_STARMIE.png"
+    },
+    {
+      "pokedexNumber": 122,
+      "indexNumber": 42,
+      "name": "MR.MIME",
+      "spriteType": "front",
+      "width": 48,
+      "height": 48,
+      "offset": "0x290F3",
+      "filename": "122_MR.MIME.png"
+    },
+    {
+      "pokedexNumber": 123,
+      "indexNumber": 26,
+      "name": "SCYTHER",
+      "spriteType": "front",
+      "width": 56,
+      "height": 56,
+      "offset": "0x2721C",
+      "filename": "123_SCYTHER.png"
+    },
+    {
+      "pokedexNumber": 124,
+      "indexNumber": 72,
+      "name": "JYNX",
+      "spriteType": "front",
+      "width": 48,
+      "height": 48,
+      "offset": "0x2B98E",
+      "filename": "124_JYNX.png"
+    },
+    {
+      "pokedexNumber": 125,
+      "indexNumber": 53,
+      "name": "ELECTABUZZ",
+      "spriteType": "front",
+      "width": 48,
+      "height": 48,
+      "offset": "0x2A367",
+      "filename": "125_ELECTABUZZ.png"
+    },
+    {
+      "pokedexNumber": 126,
+      "indexNumber": 51,
+      "name": "MAGMAR",
+      "spriteType": "front",
+      "width": 48,
+      "height": 48,
+      "offset": "0x2A161",
+      "filename": "126_MAGMAR.png"
+    },
+    {
+      "pokedexNumber": 127,
+      "indexNumber": 29,
+      "name": "PINSIR",
+      "spriteType": "front",
+      "width": 56,
+      "height": 56,
+      "offset": "0x278DA",
+      "filename": "127_PINSIR.png"
+    },
+    {
+      "pokedexNumber": 128,
+      "indexNumber": 60,
+      "name": "TAUROS",
+      "spriteType": "front",
+      "width": 56,
+      "height": 56,
+      "offset": "0x2AE7E",
+      "filename": "128_TAUROS.png"
+    },
+    {
+      "pokedexNumber": 129,
+      "indexNumber": 133,
+      "name": "MAGIKARP",
+      "spriteType": "front",
+      "width": 48,
+      "height": 48,
+      "offset": "0x31D31",
+      "filename": "129_MAGIKARP.png"
+    },
+    {
+      "pokedexNumber": 130,
+      "indexNumber": 22,
+      "name": "GYARADOS",
+      "spriteType": "front",
+      "width": 56,
+      "height": 56,
+      "offset": "0x269D4",
+      "filename": "130_GYARADOS.png"
+    },
+    {
+      "pokedexNumber": 131,
+      "indexNumber": 19,
+      "name": "LAPRAS",
+      "spriteType": "front",
+      "width": 56,
+      "height": 56,
+      "offset": "0x264C1",
+      "filename": "131_LAPRAS.png"
+    },
+    {
+      "pokedexNumber": 132,
+      "indexNumber": 76,
+      "name": "DITTO",
+      "spriteType": "front",
+      "width": 40,
+      "height": 40,
+      "offset": "0x2C514",
+      "filename": "132_DITTO.png"
+    },
+    {
+      "pokedexNumber": 133,
+      "indexNumber": 102,
+      "name": "EEVEE",
+      "spriteType": "front",
+      "width": 40,
+      "height": 40,
+      "offset": "0x2E531",
+      "filename": "133_EEVEE.png"
+    },
+    {
+      "pokedexNumber": 134,
+      "indexNumber": 105,
+      "name": "VAPOREON",
+      "spriteType": "front",
+      "width": 48,
+      "height": 48,
+      "offset": "0x2EAAE",
+      "filename": "134_VAPOREON.png"
+    },
+    {
+      "pokedexNumber": 135,
+      "indexNumber": 104,
+      "name": "JOLTEON",
+      "spriteType": "front",
+      "width": 48,
+      "height": 48,
+      "offset": "0x2E88F",
+      "filename": "135_JOLTEON.png"
+    },
+    {
+      "pokedexNumber": 136,
+      "indexNumber": 103,
+      "name": "FLAREON",
+      "spriteType": "front",
+      "width": 48,
+      "height": 48,
+      "offset": "0x2E68D",
+      "filename": "136_FLAREON.png"
+    },
+    {
+      "pokedexNumber": 137,
+      "indexNumber": 170,
+      "name": "PORYGON",
+      "spriteType": "front",
+      "width": 48,
+      "height": 48,
+      "offset": "0x35784",
+      "filename": "137_PORYGON.png"
+    },
+    {
+      "pokedexNumber": 138,
+      "indexNumber": 98,
+      "name": "OMANYTE",
+      "spriteType": "front",
+      "width": 40,
+      "height": 40,
+      "offset": "0x2DE9D",
+      "filename": "138_OMANYTE.png"
+    },
+    {
+      "pokedexNumber": 139,
+      "indexNumber": 99,
+      "name": "OMASTAR",
+      "spriteType": "front",
+      "width": 48,
+      "height": 48,
+      "offset": "0x2DFD3",
+      "filename": "139_OMASTAR.png"
+    },
+    {
+      "pokedexNumber": 140,
+      "indexNumber": 90,
+      "name": "KABUTO",
+      "spriteType": "front",
+      "width": 40,
+      "height": 40,
+      "offset": "0x2D464",
+      "filename": "140_KABUTO.png"
+    },
+    {
+      "pokedexNumber": 141,
+      "indexNumber": 91,
+      "name": "KABUTOPS",
+      "spriteType": "front",
+      "width": 48,
+      "height": 48,
+      "offset": "0x2D583",
+      "filename": "141_KABUTOPS.png"
+    },
+    {
+      "pokedexNumber": 142,
+      "indexNumber": 171,
+      "name": "AERODACTYL",
+      "spriteType": "front",
+      "width": 56,
+      "height": 56,
+      "offset": "0x35931",
+      "filename": "142_AERODACTYL.png"
+    },
+    {
+      "pokedexNumber": 143,
+      "indexNumber": 132,
+      "name": "SNORLAX",
+      "spriteType": "front",
+      "width": 56,
+      "height": 56,
+      "offset": "0x31B19",
+      "filename": "143_SNORLAX.png"
+    },
+    {
+      "pokedexNumber": 144,
+      "indexNumber": 74,
+      "name": "ARTICUNO",
+      "spriteType": "front",
+      "width": 56,
+      "height": 56,
+      "offset": "0x2C000",
+      "filename": "144_ARTICUNO.png"
+    },
+    {
+      "pokedexNumber": 145,
+      "indexNumber": 75,
+      "name": "ZAPDOS",
+      "spriteType": "front",
+      "width": 56,
+      "height": 56,
+      "offset": "0x2C29D",
+      "filename": "145_ZAPDOS.png"
+    },
+    {
+      "pokedexNumber": 146,
+      "indexNumber": 73,
+      "name": "MOLTRES",
+      "spriteType": "front",
+      "width": 56,
+      "height": 56,
+      "offset": "0x2BBAC",
+      "filename": "146_MOLTRES.png"
+    },
+    {
+      "pokedexNumber": 147,
+      "indexNumber": 88,
+      "name": "DRATINI",
+      "spriteType": "front",
+      "width": 40,
+      "height": 40,
+      "offset": "0x2D151",
+      "filename": "147_DRATINI.png"
+    },
+    {
+      "pokedexNumber": 148,
+      "indexNumber": 89,
+      "name": "DRAGONAIR",
+      "spriteType": "front",
+      "width": 48,
+      "height": 48,
+      "offset": "0x2D297",
+      "filename": "148_DRAGONAIR.png"
+    },
+    {
+      "pokedexNumber": 149,
+      "indexNumber": 66,
+      "name": "DRAGONITE",
+      "spriteType": "front",
+      "width": 56,
+      "height": 56,
+      "offset": "0x2B4AA",
+      "filename": "149_DRAGONITE.png"
+    },
+    {
+      "pokedexNumber": 150,
+      "indexNumber": 131,
+      "name": "MEWTWO",
+      "spriteType": "front",
+      "width": 56,
+      "height": 56,
+      "offset": "0x3187F",
+      "filename": "150_MEWTWO.png"
+    },
+    {
+      "pokedexNumber": 151,
+      "indexNumber": 21,
+      "name": "MEW",
+      "spriteType": "front",
+      "width": 40,
+      "height": 40,
+      "offset": "0x4112",
+      "filename": "151_MEW.png"
+    }
+  ]
+}

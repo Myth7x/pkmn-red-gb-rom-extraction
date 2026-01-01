@@ -1,0 +1,766 @@
+{
+  "extractionDate": "2026-01-01T01:32:43.906Z",
+  "totalNames": 190,
+  "names": [
+    {
+      "internalId": 1,
+      "name": "RHYDON"
+    },
+    {
+      "internalId": 2,
+      "name": "KANGASKHAN"
+    },
+    {
+      "internalId": 3,
+      "name": "NIDORANM"
+    },
+    {
+      "internalId": 4,
+      "name": "CLEFAIRY"
+    },
+    {
+      "internalId": 5,
+      "name": "SPEAROW"
+    },
+    {
+      "internalId": 6,
+      "name": "VOLTORB"
+    },
+    {
+      "internalId": 7,
+      "name": "NIDOKING"
+    },
+    {
+      "internalId": 8,
+      "name": "SLOWBRO"
+    },
+    {
+      "internalId": 9,
+      "name": "IVYSAUR"
+    },
+    {
+      "internalId": 10,
+      "name": "EXEGGUTOR"
+    },
+    {
+      "internalId": 11,
+      "name": "LICKITUNG"
+    },
+    {
+      "internalId": 12,
+      "name": "EXEGGCUTE"
+    },
+    {
+      "internalId": 13,
+      "name": "GRIMER"
+    },
+    {
+      "internalId": 14,
+      "name": "GENGAR"
+    },
+    {
+      "internalId": 15,
+      "name": "NIDORANF"
+    },
+    {
+      "internalId": 16,
+      "name": "NIDOQUEEN"
+    },
+    {
+      "internalId": 17,
+      "name": "CUBONE"
+    },
+    {
+      "internalId": 18,
+      "name": "RHYHORN"
+    },
+    {
+      "internalId": 19,
+      "name": "LAPRAS"
+    },
+    {
+      "internalId": 20,
+      "name": "ARCANINE"
+    },
+    {
+      "internalId": 21,
+      "name": "MEW"
+    },
+    {
+      "internalId": 22,
+      "name": "GYARADOS"
+    },
+    {
+      "internalId": 23,
+      "name": "SHELLDER"
+    },
+    {
+      "internalId": 24,
+      "name": "TENTACOOL"
+    },
+    {
+      "internalId": 25,
+      "name": "GASTLY"
+    },
+    {
+      "internalId": 26,
+      "name": "SCYTHER"
+    },
+    {
+      "internalId": 27,
+      "name": "STARYU"
+    },
+    {
+      "internalId": 28,
+      "name": "BLASTOISE"
+    },
+    {
+      "internalId": 29,
+      "name": "PINSIR"
+    },
+    {
+      "internalId": 30,
+      "name": "TANGELA"
+    },
+    {
+      "internalId": 31,
+      "name": "MISSINGNO."
+    },
+    {
+      "internalId": 32,
+      "name": "MISSINGNO."
+    },
+    {
+      "internalId": 33,
+      "name": "GROWLITHE"
+    },
+    {
+      "internalId": 34,
+      "name": "ONIX"
+    },
+    {
+      "internalId": 35,
+      "name": "FEAROW"
+    },
+    {
+      "internalId": 36,
+      "name": "PIDGEY"
+    },
+    {
+      "internalId": 37,
+      "name": "SLOWPOKE"
+    },
+    {
+      "internalId": 38,
+      "name": "KADABRA"
+    },
+    {
+      "internalId": 39,
+      "name": "GRAVELER"
+    },
+    {
+      "internalId": 40,
+      "name": "CHANSEY"
+    },
+    {
+      "internalId": 41,
+      "name": "MACHOKE"
+    },
+    {
+      "internalId": 42,
+      "name": "MR.MIME"
+    },
+    {
+      "internalId": 43,
+      "name": "HITMONLEE"
+    },
+    {
+      "internalId": 44,
+      "name": "HITMONCHAN"
+    },
+    {
+      "internalId": 45,
+      "name": "ARBOK"
+    },
+    {
+      "internalId": 46,
+      "name": "PARASECT"
+    },
+    {
+      "internalId": 47,
+      "name": "PSYDUCK"
+    },
+    {
+      "internalId": 48,
+      "name": "DROWZEE"
+    },
+    {
+      "internalId": 49,
+      "name": "GOLEM"
+    },
+    {
+      "internalId": 50,
+      "name": "MISSINGNO."
+    },
+    {
+      "internalId": 51,
+      "name": "MAGMAR"
+    },
+    {
+      "internalId": 52,
+      "name": "MISSINGNO."
+    },
+    {
+      "internalId": 53,
+      "name": "ELECTABUZZ"
+    },
+    {
+      "internalId": 54,
+      "name": "MAGNETON"
+    },
+    {
+      "internalId": 55,
+      "name": "KOFFING"
+    },
+    {
+      "internalId": 56,
+      "name": "MISSINGNO."
+    },
+    {
+      "internalId": 57,
+      "name": "MANKEY"
+    },
+    {
+      "internalId": 58,
+      "name": "SEEL"
+    },
+    {
+      "internalId": 59,
+      "name": "DIGLETT"
+    },
+    {
+      "internalId": 60,
+      "name": "TAUROS"
+    },
+    {
+      "internalId": 61,
+      "name": "MISSINGNO."
+    },
+    {
+      "internalId": 62,
+      "name": "MISSINGNO."
+    },
+    {
+      "internalId": 63,
+      "name": "MISSINGNO."
+    },
+    {
+      "internalId": 64,
+      "name": "FARFETCH'D"
+    },
+    {
+      "internalId": 65,
+      "name": "VENONAT"
+    },
+    {
+      "internalId": 66,
+      "name": "DRAGONITE"
+    },
+    {
+      "internalId": 67,
+      "name": "MISSINGNO."
+    },
+    {
+      "internalId": 68,
+      "name": "MISSINGNO."
+    },
+    {
+      "internalId": 69,
+      "name": "MISSINGNO."
+    },
+    {
+      "internalId": 70,
+      "name": "DODUO"
+    },
+    {
+      "internalId": 71,
+      "name": "POLIWAG"
+    },
+    {
+      "internalId": 72,
+      "name": "JYNX"
+    },
+    {
+      "internalId": 73,
+      "name": "MOLTRES"
+    },
+    {
+      "internalId": 74,
+      "name": "ARTICUNO"
+    },
+    {
+      "internalId": 75,
+      "name": "ZAPDOS"
+    },
+    {
+      "internalId": 76,
+      "name": "DITTO"
+    },
+    {
+      "internalId": 77,
+      "name": "MEOWTH"
+    },
+    {
+      "internalId": 78,
+      "name": "KRABBY"
+    },
+    {
+      "internalId": 79,
+      "name": "MISSINGNO."
+    },
+    {
+      "internalId": 80,
+      "name": "MISSINGNO."
+    },
+    {
+      "internalId": 81,
+      "name": "MISSINGNO."
+    },
+    {
+      "internalId": 82,
+      "name": "VULPIX"
+    },
+    {
+      "internalId": 83,
+      "name": "NINETALES"
+    },
+    {
+      "internalId": 84,
+      "name": "PIKACHU"
+    },
+    {
+      "internalId": 85,
+      "name": "RAICHU"
+    },
+    {
+      "internalId": 86,
+      "name": "MISSINGNO."
+    },
+    {
+      "internalId": 87,
+      "name": "MISSINGNO."
+    },
+    {
+      "internalId": 88,
+      "name": "DRATINI"
+    },
+    {
+      "internalId": 89,
+      "name": "DRAGONAIR"
+    },
+    {
+      "internalId": 90,
+      "name": "KABUTO"
+    },
+    {
+      "internalId": 91,
+      "name": "KABUTOPS"
+    },
+    {
+      "internalId": 92,
+      "name": "HORSEA"
+    },
+    {
+      "internalId": 93,
+      "name": "SEADRA"
+    },
+    {
+      "internalId": 94,
+      "name": "MISSINGNO."
+    },
+    {
+      "internalId": 95,
+      "name": "MISSINGNO."
+    },
+    {
+      "internalId": 96,
+      "name": "SANDSHREW"
+    },
+    {
+      "internalId": 97,
+      "name": "SANDSLASH"
+    },
+    {
+      "internalId": 98,
+      "name": "OMANYTE"
+    },
+    {
+      "internalId": 99,
+      "name": "OMASTAR"
+    },
+    {
+      "internalId": 100,
+      "name": "JIGGLYPUFF"
+    },
+    {
+      "internalId": 101,
+      "name": "WIGGLYTUFF"
+    },
+    {
+      "internalId": 102,
+      "name": "EEVEE"
+    },
+    {
+      "internalId": 103,
+      "name": "FLAREON"
+    },
+    {
+      "internalId": 104,
+      "name": "JOLTEON"
+    },
+    {
+      "internalId": 105,
+      "name": "VAPOREON"
+    },
+    {
+      "internalId": 106,
+      "name": "MACHOP"
+    },
+    {
+      "internalId": 107,
+      "name": "ZUBAT"
+    },
+    {
+      "internalId": 108,
+      "name": "EKANS"
+    },
+    {
+      "internalId": 109,
+      "name": "PARAS"
+    },
+    {
+      "internalId": 110,
+      "name": "POLIWHIRL"
+    },
+    {
+      "internalId": 111,
+      "name": "POLIWRATH"
+    },
+    {
+      "internalId": 112,
+      "name": "WEEDLE"
+    },
+    {
+      "internalId": 113,
+      "name": "KAKUNA"
+    },
+    {
+      "internalId": 114,
+      "name": "BEEDRILL"
+    },
+    {
+      "internalId": 115,
+      "name": "MISSINGNO."
+    },
+    {
+      "internalId": 116,
+      "name": "DODRIO"
+    },
+    {
+      "internalId": 117,
+      "name": "PRIMEAPE"
+    },
+    {
+      "internalId": 118,
+      "name": "DUGTRIO"
+    },
+    {
+      "internalId": 119,
+      "name": "VENOMOTH"
+    },
+    {
+      "internalId": 120,
+      "name": "DEWGONG"
+    },
+    {
+      "internalId": 121,
+      "name": "MISSINGNO."
+    },
+    {
+      "internalId": 122,
+      "name": "MISSINGNO."
+    },
+    {
+      "internalId": 123,
+      "name": "CATERPIE"
+    },
+    {
+      "internalId": 124,
+      "name": "METAPOD"
+    },
+    {
+      "internalId": 125,
+      "name": "BUTTERFREE"
+    },
+    {
+      "internalId": 126,
+      "name": "MACHAMP"
+    },
+    {
+      "internalId": 127,
+      "name": "MISSINGNO."
+    },
+    {
+      "internalId": 128,
+      "name": "GOLDUCK"
+    },
+    {
+      "internalId": 129,
+      "name": "HYPNO"
+    },
+    {
+      "internalId": 130,
+      "name": "GOLBAT"
+    },
+    {
+      "internalId": 131,
+      "name": "MEWTWO"
+    },
+    {
+      "internalId": 132,
+      "name": "SNORLAX"
+    },
+    {
+      "internalId": 133,
+      "name": "MAGIKARP"
+    },
+    {
+      "internalId": 134,
+      "name": "MISSINGNO."
+    },
+    {
+      "internalId": 135,
+      "name": "MISSINGNO."
+    },
+    {
+      "internalId": 136,
+      "name": "MUK"
+    },
+    {
+      "internalId": 137,
+      "name": "MISSINGNO."
+    },
+    {
+      "internalId": 138,
+      "name": "KINGLER"
+    },
+    {
+      "internalId": 139,
+      "name": "CLOYSTER"
+    },
+    {
+      "internalId": 140,
+      "name": "MISSINGNO."
+    },
+    {
+      "internalId": 141,
+      "name": "ELECTRODE"
+    },
+    {
+      "internalId": 142,
+      "name": "CLEFABLE"
+    },
+    {
+      "internalId": 143,
+      "name": "WEEZING"
+    },
+    {
+      "internalId": 144,
+      "name": "PERSIAN"
+    },
+    {
+      "internalId": 145,
+      "name": "MAROWAK"
+    },
+    {
+      "internalId": 146,
+      "name": "MISSINGNO."
+    },
+    {
+      "internalId": 147,
+      "name": "HAUNTER"
+    },
+    {
+      "internalId": 148,
+      "name": "ABRA"
+    },
+    {
+      "internalId": 149,
+      "name": "ALAKAZAM"
+    },
+    {
+      "internalId": 150,
+      "name": "PIDGEOTTO"
+    },
+    {
+      "internalId": 151,
+      "name": "PIDGEOT"
+    },
+    {
+      "internalId": 152,
+      "name": "STARMIE"
+    },
+    {
+      "internalId": 153,
+      "name": "BULBASAUR"
+    },
+    {
+      "internalId": 154,
+      "name": "VENUSAUR"
+    },
+    {
+      "internalId": 155,
+      "name": "TENTACRUEL"
+    },
+    {
+      "internalId": 156,
+      "name": "MISSINGNO."
+    },
+    {
+      "internalId": 157,
+      "name": "GOLDEEN"
+    },
+    {
+      "internalId": 158,
+      "name": "SEAKING"
+    },
+    {
+      "internalId": 159,
+      "name": "MISSINGNO."
+    },
+    {
+      "internalId": 160,
+      "name": "MISSINGNO."
+    },
+    {
+      "internalId": 161,
+      "name": "MISSINGNO."
+    },
+    {
+      "internalId": 162,
+      "name": "MISSINGNO."
+    },
+    {
+      "internalId": 163,
+      "name": "PONYTA"
+    },
+    {
+      "internalId": 164,
+      "name": "RAPIDASH"
+    },
+    {
+      "internalId": 165,
+      "name": "RATTATA"
+    },
+    {
+      "internalId": 166,
+      "name": "RATICATE"
+    },
+    {
+      "internalId": 167,
+      "name": "NIDORINO"
+    },
+    {
+      "internalId": 168,
+      "name": "NIDORINA"
+    },
+    {
+      "internalId": 169,
+      "name": "GEODUDE"
+    },
+    {
+      "internalId": 170,
+      "name": "PORYGON"
+    },
+    {
+      "internalId": 171,
+      "name": "AERODACTYL"
+    },
+    {
+      "internalId": 172,
+      "name": "MISSINGNO."
+    },
+    {
+      "internalId": 173,
+      "name": "MAGNEMITE"
+    },
+    {
+      "internalId": 174,
+      "name": "MISSINGNO."
+    },
+    {
+      "internalId": 175,
+      "name": "MISSINGNO."
+    },
+    {
+      "internalId": 176,
+      "name": "CHARMANDER"
+    },
+    {
+      "internalId": 177,
+      "name": "SQUIRTLE"
+    },
+    {
+      "internalId": 178,
+      "name": "CHARMELEON"
+    },
+    {
+      "internalId": 179,
+      "name": "WARTORTLE"
+    },
+    {
+      "internalId": 180,
+      "name": "CHARIZARD"
+    },
+    {
+      "internalId": 181,
+      "name": "MISSINGNO."
+    },
+    {
+      "internalId": 182,
+      "name": "MISSINGNO."
+    },
+    {
+      "internalId": 183,
+      "name": "MISSINGNO."
+    },
+    {
+      "internalId": 184,
+      "name": "MISSINGNO."
+    },
+    {
+      "internalId": 185,
+      "name": "ODDISH"
+    },
+    {
+      "internalId": 186,
+      "name": "GLOOM"
+    },
+    {
+      "internalId": 187,
+      "name": "VILEPLUME"
+    },
+    {
+      "internalId": 188,
+      "name": "BELLSPROUT"
+    },
+    {
+      "internalId": 189,
+      "name": "WEEPINBELL"
+    },
+    {
+      "internalId": 190,
+      "name": "VICTREEBEL"
+    }
+  ]
+}

@@ -15,6 +15,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { PNG } from 'pngjs';
 
 // ROM SDK imports
 import { loadROM } from './rom-sdk/romReader.js';
@@ -22,6 +23,7 @@ import { extractSpriteData } from './rom-sdk/spriteExtractor.js';
 import { decompressSprite } from './rom-sdk/spriteDecompressor.js';
 import { extractPokemonNames, getPokemonNameByInternalId } from './rom-sdk/nameExtractor.js';
 import { extractAllMaps, extractAllTilesets, addTileMetadataToMaps, saveMapDataJSON, saveTilesetDataJSON, exportTilesetGraphics } from './rom-sdk/mapDataExtractor.js';
+import { extractAllOverworldSprites, spriteToPNG, SPRITE_NAMES } from './rom-sdk/overworldSpriteExtractor.js';
 
 // Utils imports
 import { GAMEBOY_PALETTE, GRAY_PALETTE } from './utils/palettes.js';
@@ -249,6 +251,60 @@ function extractMaps(romPath, outputDir) {
 }
 
 /**
+ * Extract overworld sprites
+ * @param {String} romPath - Path to ROM file
+ * @param {String} outputDir - Output directory
+ */
+function extractOverworldSprites(romPath, outputDir) {
+  console.log('\n============================================================');
+  console.log('Extracting Overworld Sprites');
+  console.log('============================================================\n');
+  
+  const rom = loadROM(romPath);
+  const spritesDir = path.join(outputDir, 'overworld-sprites');
+  
+  // Ensure directory exists
+  fs.mkdirSync(spritesDir, { recursive: true });
+  
+  // Extract all overworld sprites (returns array)
+  const spriteArray = extractAllOverworldSprites(rom);
+  
+  // Save each sprite as PNG (format: 003_BUG_CATCHER.png)
+  for (const sprite of spriteArray) {
+    const filename = `${String(sprite.id).padStart(3, '0')}_${SPRITE_NAMES[sprite.id] || 'UNKNOWN'}.png`;
+    const outputPath = path.join(spritesDir, filename);
+    const png = spriteToPNG(sprite);
+    const buffer = PNG.sync.write(png);
+    fs.writeFileSync(outputPath, buffer);
+  }
+  
+  // Create metadata object
+  const overworldData = {
+    extractionDate: new Date().toISOString(),
+    totalSprites: spriteArray.length,
+    sprites: spriteArray.map(s => ({
+      id: s.id,
+      name: SPRITE_NAMES[s.id] || 'UNKNOWN',
+      bank: s.bank,
+      pointer: s.pointer,
+      romAddress: s.romAddress,
+      byteCount: s.byteCount,
+      width: s.width,
+      height: s.height,
+      filename: `${String(s.id).padStart(3, '0')}_${SPRITE_NAMES[s.id] || 'UNKNOWN'}.png`
+    }))
+  };
+  
+  // Save metadata JSON
+  const metadataPath = path.join(spritesDir, 'overworld_sprites.json');
+  fs.writeFileSync(metadataPath, JSON.stringify(overworldData, null, 2));
+  
+  console.log(`\n[OK] Overworld sprites extracted successfully!`);
+  console.log(`  Total sprites: ${overworldData.sprites.length}`);
+  console.log(`  Output: ${spritesDir}\n`);
+}
+
+/**
  * Main execution function
  */
 function main() {
@@ -310,6 +366,9 @@ function main() {
       
       // Extract map data (includes tileset graphics)
       extractMaps(romPath, outputDir);
+      
+      // Extract overworld sprites
+      extractOverworldSprites(romPath, outputDir);
       break;
       
     case 'pkmn':

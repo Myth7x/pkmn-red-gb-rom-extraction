@@ -15,6 +15,7 @@ import { PNG } from 'pngjs';
 import { MAP_NAMES } from './mapConstants.js';
 import { readAllMapHeaders, readMapBlockData } from './mapHeaderReader.js';
 import { readMapObjects, getObjectSummary } from './mapObjectReader.js';
+import { extractScriptText } from './scriptTextReader.js';
 import {
   readTilesetHeader,
   readAllTilesetHeaders,
@@ -41,6 +42,28 @@ export function extractMapData(rom, mapId, mapHeader) {
     // Read map objects (warps, signs, sprites)
     const objects = readMapObjects(rom, mapHeader, mapHeader.bank);
     const objectSummary = getObjectSummary(objects);
+
+    // Extract script text for sprites (NPCs)
+    if (objects.sprites && objects.sprites.data) {
+      for (const sprite of objects.sprites.data) {
+        try {
+          sprite.scriptText = extractScriptText(rom, mapHeader, mapHeader.bank, sprite.textId);
+        } catch (error) {
+          sprite.scriptText = { error: `Failed to extract script: ${error.message}` };
+        }
+      }
+    }
+
+    // Extract script text for signs
+    if (objects.signs && objects.signs.data) {
+      for (const sign of objects.signs.data) {
+        try {
+          sign.scriptText = extractScriptText(rom, mapHeader, mapHeader.bank, sign.textId);
+        } catch (error) {
+          sign.scriptText = { error: `Failed to extract script: ${error.message}` };
+        }
+      }
+    }
 
     // Read map block data
     const blockData = readMapBlockData(rom, mapHeader, mapHeader.bank);

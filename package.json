@@ -10,8 +10,10 @@
         "extract:pkmn": "node src/index.js pkmn",
         "extract:maps": "node src/index.js maps",
         "extract:names": "node src/index.js names",
-        "http-server": "http-server ./output -p 8080",
-        "world-map": "http-server ./output -p 8080 -o /webclient/world-map.html"
+        "extract:overworld": "node src/extractOverworldSprites.js",
+        "http-server": "http-server ./ -p 8080",
+        "world-map": "http-server ./ -p 8080 -o /webclient/world-map.html",
+        "viewer": "http-server ./ -p 8080 -o /webclient/map-viewer.html"
     },
     "keywords": [
         "pokemon",
