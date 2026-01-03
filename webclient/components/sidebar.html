@@ -1,0 +1,34 @@
+<!-- Sidebar Component -->
+<div id="sidebar" class="hidden">
+    <div class="card mb-3">
+        <div class="card-header collapsible-header" data-panel="controls">
+            <i class="bi bi-gear"></i> Controls
+            <i class="bi bi-chevron-down collapse-icon"></i>
+        </div>
+        <div class="card-body panel-content" id="panel-controls">
+            <!-- Zoom Controls -->
+            <div class="mb-3">
+                <label class="form-label"><i class="bi bi-zoom-in"></i> Zoom Level: <span id="zoomLevel">1x</span></label>
+                <div class="d-flex align-items-center gap-2">
+                    <small class="text-muted" style="min-width: 30px;">In</small>
+                    <input type="range" class="form-range flex-grow-1" id="zoomSlider" 
+                           min="0.5" max="40" step="0.1" value="2">
+                    <small class="text-muted" style="min-width: 35px;">Out</small>
+                </div>
+                <div class="mt-2">
+                    <button id="resetZoomBtn" class="btn btn-secondary btn-sm w-100">
+                        <i class="bi bi-arrow-counterclockwise"></i> Reset & Center
+                    </button>
+                </div>
+            </div>
+
+            <hr class="my-3">
+
+            <!-- Dynamic content insertion point -->
+            <div id="sidebar-controls-dynamic"></div>
+        </div>
+    </div>
+
+    <!-- Dynamic sections insertion point -->
+    <div id="sidebar-sections"></div>
+</div>

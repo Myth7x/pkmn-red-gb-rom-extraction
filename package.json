@@ -11,9 +11,13 @@
         "extract:maps": "node src/index.js maps",
         "extract:names": "node src/index.js names",
         "extract:overworld": "node src/extractOverworldSprites.js",
+        "build": "node build-minified.js",
+        "build:serve": "npm run build && npm run serve:dist",
         "http-server": "http-server ./ -p 8080",
+        "serve": "http-server ./ -p 8080 -o /webclient/index.html",
+        "serve:dist": "http-server ./webclient-dist -p 8080 -o /index.html",
         "world-map": "http-server ./ -p 8080 -o /webclient/world-map.html",
-        "viewer": "http-server ./ -p 8080 -o /webclient/map-viewer.html"
+        "viewer": "http-server ./ -p 8080 -o /webclient/index.html"
     },
     "keywords": [
         "pokemon",
@@ -27,6 +31,8 @@
         "pngjs": "^7.0.0"
     },
     "devDependencies": {
-        "http-server": "^14.1.1"
+        "html-minifier-terser": "^7.2.0",
+        "http-server": "^14.1.1",
+        "terser": "^5.44.1"
     }
 }

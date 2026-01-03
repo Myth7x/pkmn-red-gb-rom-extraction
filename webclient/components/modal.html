@@ -1,0 +1,21 @@
+<!-- Modal Component -->
+<div class="modal fade" id="{{id}}" tabindex="-1" aria-labelledby="{{id}}Label" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered {{size}}">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="{{id}}Label">
+                    <i class="bi {{icon}}"></i> {{title}}
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="{{id}}Content">
+                {{content}}
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="bi bi-x-circle"></i> Close
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
