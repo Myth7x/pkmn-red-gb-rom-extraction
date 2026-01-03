@@ -1,5 +1,6 @@
 // Configuration settings for the Map Viewer
 
+// Always update version after changes
 export const MODULE_VERSION = '1.0.0';
 
 export class Config {

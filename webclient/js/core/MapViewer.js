@@ -1,8 +1,9 @@
 // Main Map Viewer Application Controller
-import { MAP_VIEWER_VERSION, MAP_VIEWER_BUILD_DATE, TILE_SIZE, BLOCK_SIZE, MODULE_VERSIONS, getMovementInfo } from './Constants.js';
+import { MAP_VIEWER_VERSION, MAP_VIEWER_BUILD_DATE, TILE_SIZE, BLOCK_SIZE, MODULE_VERSIONS, getMovementInfo, MIN_ZOOM, MAX_ZOOM, DEFAULT_OFFSET_X, DEFAULT_OFFSET_Y } from './Constants.js';
 import { Config } from './Config.js';
 import { Logger } from '../utils/Logger.js';
 import { ErrorHandler } from '../utils/ErrorHandler.js';
+import { FPSCounter } from '../utils/FPSCounter.js';
 import { ViewportState } from '../state/ViewportState.js';
 import { MapState } from '../state/MapState.js';
 import { PreferencesManager } from '../state/PreferencesManager.js';
@@ -11,11 +12,17 @@ import { TilesetManager } from '../data/TilesetManager.js';
 import { SpriteManager } from '../data/SpriteManager.js';
 import { CanvasRenderer } from '../rendering/CanvasRenderer.js';
 import { NPCMovementEngine } from '../movement/NPCMovement.js';
+import { TileAnimator } from '../animation/TileAnimator.js';
+import { MapConnectionAligner } from '../utils/MapConnectionAligner.js';
+import { TileAnimationDebugPanel } from '../ui/TileAnimationDebugPanel.js';
+import { InteriorMapLayoutManager } from '../layout/InteriorMapLayoutManager.js';
+import { InteriorMapRenderer } from '../rendering/InteriorMapRenderer.js';
 
 // Import module versions
 import { MODULE_VERSION as CONFIG_VERSION } from './Config.js';
 import { MODULE_VERSION as LOGGER_VERSION } from '../utils/Logger.js';
 import { MODULE_VERSION as ERROR_HANDLER_VERSION } from '../utils/ErrorHandler.js';
+import { MODULE_VERSION as FPS_COUNTER_VERSION } from '../utils/FPSCounter.js';
 import { MODULE_VERSION as VIEWPORT_STATE_VERSION } from '../state/ViewportState.js';
 import { MODULE_VERSION as MAP_STATE_VERSION } from '../state/MapState.js';
 import { MODULE_VERSION as PREFERENCES_VERSION } from '../state/PreferencesManager.js';
@@ -24,8 +31,13 @@ import { MODULE_VERSION as MAP_DATA_VERSION } from '../data/MapDataManager.js';
 import { MODULE_VERSION as TILESET_VERSION } from '../data/TilesetManager.js';
 import { MODULE_VERSION as SPRITE_VERSION } from '../data/SpriteManager.js';
 import { MODULE_VERSION as RENDERER_VERSION } from '../rendering/CanvasRenderer.js';
+import { MODULE_VERSION as NPC_MOVEMENT_VERSION } from '../movement/NPCMovement.js';
+import { MODULE_VERSION as TILE_ANIMATOR_VERSION } from '../animation/TileAnimator.js';
+import { MODULE_VERSION as INTERIOR_LAYOUT_VERSION } from '../layout/InteriorMapLayoutManager.js';
+import { MODULE_VERSION as INTERIOR_RENDERER_VERSION } from '../rendering/InteriorMapRenderer.js';
 
-export const MODULE_VERSION = '1.0.4';
+// Always update version after changes
+export const MODULE_VERSION = '1.5.0';
 
 export class MapViewer {
     constructor(canvasId) {
@@ -34,6 +46,9 @@ export class MapViewer {
         
         // Core configuration
         this.config = new Config();
+        
+        // FPS Counter
+        this.fpsCounter = new FPSCounter();
         
         // Canvas setup
         this.canvas = document.getElementById(canvasId);
@@ -53,6 +68,20 @@ export class MapViewer {
         this.tilesetManager = new TilesetManager(this.config);
         this.spriteManager = new SpriteManager(this.config);
         
+        // Animation system
+        this.tileAnimator = new TileAnimator(this.config);
+        
+        // Tile animation debug panel
+        this.tileAnimationDebugPanel = new TileAnimationDebugPanel(this.tileAnimator);
+        
+        // Interior map layout system
+        this.interiorLayoutManager = null; // Will be initialized after mapDataManager
+        this.interiorRenderer = null;
+        this.showingInteriorLayout = false;
+        
+        // Connection alignment system
+        this.connectionAligner = new MapConnectionAligner(this.tilesetManager);
+        
         // Movement engine
         this.movementEngine = new NPCMovementEngine();
         this.movementEnabled = true; // Toggle for NPC movement
@@ -68,10 +97,19 @@ export class MapViewer {
         this.showCoordLabels = false;
         this.showTooltip = true;
         this.hoveredTile = null;
+        this.tileOptimizationEnabled = true; // Viewport culling for tile rendering
+        
+        // Rendering state
+        this.isRendering = false; // Prevent concurrent render calls
         
         // Input state
         this.isDragging = false;
         this.dragStart = { x: 0, y: 0 };
+        
+        // Room dragging state for interior layout mode
+        this.isRoomDragging = false;
+        this.draggedRoom = null;
+        this.roomDragOffset = { x: 0, y: 0 };
         
         // Error handler
         this.errorHandler = new ErrorHandler();
@@ -93,6 +131,25 @@ export class MapViewer {
             
             // Restore preferences
             this.restorePreferences();
+            
+            // Initialize collapsible panels
+            this.initCollapsiblePanels();
+            
+            // Initialize interior layout system
+            this.interiorLayoutManager = new InteriorMapLayoutManager(this.mapDataManager);
+            this.interiorRenderer = new InteriorMapRenderer(
+                this.canvas,
+                this.ctx,
+                this.tilesetManager,
+                null, // collisionTileManager - not needed for now
+                this.tileAnimator
+            );
+            
+            // Sync collision overlay setting with interior renderer
+            this.interiorRenderer.setShowCollisionOverlays(this.showOverlays);
+            
+            // Sync tile optimization setting with interior renderer (will be updated after preferences load)
+            this.interiorRenderer.setTileOptimization(this.tileOptimizationEnabled);
             
             // Setup canvas
             this.resizeCanvas();
@@ -136,15 +193,31 @@ export class MapViewer {
     startRenderLoop() {
         let lastFrameTime = Date.now();
         
+        // Initialize FPS display
+        const fpsElement = document.getElementById('fpsDisplay');
+        if (fpsElement) {
+            this.fpsCounter.setDisplayElement(fpsElement);
+        }
+        
         const loop = () => {
             const now = Date.now();
             const delta = now - lastFrameTime;
             
             // Render at ~60 FPS (16.67ms per frame)
             if (delta >= 16) {
+                // Update tile animations
+                this.tileAnimator.update();
+                
                 if (this.movementEnabled && this.movementEngine.isRunning) {
                     this.render();
+                } else {
+                    // Still render if animations are active (for water/flower tiles)
+                    this.render();
                 }
+                
+                // Track FPS
+                this.fpsCounter.tick();
+                
                 lastFrameTime = now;
             }
             
@@ -157,7 +230,7 @@ export class MapViewer {
     restorePreferences() {
         // Restore zoom
         const savedZoom = this.preferences.loadZoom(this.config.defaults.zoom);
-        if (savedZoom >= 1 && savedZoom <= 8) {
+        if (savedZoom >= MIN_ZOOM && savedZoom <= MAX_ZOOM) {
             this.viewportState.setScale(savedZoom);
         }
         
@@ -168,18 +241,72 @@ export class MapViewer {
         this.showCoordLabels = overlaySettings.showCoordLabels;
         this.showTooltip = overlaySettings.showTooltip !== false; // Default to true
         
+        // Restore tile optimization preference
+        this.tileOptimizationEnabled = this.preferences.loadTileOptimization();
+        
+        // Sync interior renderer overlay settings
+        if (this.interiorRenderer) {
+            this.interiorRenderer.setShowCollisionOverlays(this.showOverlays);
+            this.interiorRenderer.setTileOptimization(this.tileOptimizationEnabled);
+        }
+        
+        // Restore interior layout preference (will be applied when map loads)
+        this.showingInteriorLayout = this.preferences.loadShowInteriorLayout();
+        
         // Restore sidebar state
         const sidebarHidden = this.preferences.loadSidebarState();
-        if (sidebarHidden) {
-            const sidebar = document.getElementById('sidebar');
-            const toggleBtn = document.getElementById('toggleSidebarBtn');
-            if (sidebar && toggleBtn) {
+        const sidebar = document.getElementById('sidebar');
+        const toggleBtn = document.getElementById('toggleSidebarBtn');
+        
+        if (sidebar && toggleBtn) {
+            if (sidebarHidden) {
                 sidebar.classList.add('hidden');
                 toggleBtn.classList.remove('sidebar-visible');
                 toggleBtn.textContent = '☰';
-                Logger.log('Restored sidebar state: HIDDEN');
+            } else {
+                sidebar.classList.remove('hidden');
+                toggleBtn.classList.add('sidebar-visible');
+                toggleBtn.textContent = '✕';
             }
+            Logger.log(`Restored sidebar state: ${sidebarHidden ? 'HIDDEN' : 'VISIBLE'}`);
         }
+    }
+    
+    /**
+     * Initialize collapsible panel functionality
+     */
+    initCollapsiblePanels() {
+        const headers = document.querySelectorAll('.collapsible-header');
+        
+        headers.forEach(header => {
+            const panelName = header.dataset.panel;
+            const content = document.getElementById(`panel-${panelName}`);
+            
+            if (!content) return;
+            
+            // Load saved state (default to collapsed)
+            const isCollapsed = this.preferences.loadPanelState(panelName);
+            
+            if (isCollapsed) {
+                header.classList.add('collapsed');
+                content.classList.add('collapsed');
+            }
+            
+            // Add click handler
+            header.addEventListener('click', () => {
+                const isCurrentlyCollapsed = header.classList.contains('collapsed');
+                
+                header.classList.toggle('collapsed');
+                content.classList.toggle('collapsed');
+                
+                // Save new state
+                this.preferences.savePanelState(panelName, !isCurrentlyCollapsed);
+                
+                Logger.log(`Panel ${panelName}: ${!isCurrentlyCollapsed ? 'COLLAPSED' : 'EXPANDED'}`);
+            });
+        });
+        
+        Logger.log('Collapsible panels initialized');
     }
     
     resizeCanvas() {
@@ -190,161 +317,461 @@ export class MapViewer {
         }
     }
     
-    // This will be continued in the next part...
-    render() {
+    /**
+     * Get all connected maps that should be rendered in the viewport
+     * Returns array of {map, offsetX, offsetY} objects
+     */
+    async getVisibleConnectedMaps() {
         const currentMap = this.mapState.getCurrentMap();
-        if (!currentMap || !this.tilesetManager.hasTileset(currentMap.tileset)) {
-            return;
-        }
+        if (!currentMap) return [];
         
-        // Clear canvas
-        this.renderer.clear('#000');
+        // Return current map plus all connected maps
+        const result = [{
+            map: currentMap,
+            offsetX: 0,
+            offsetY: 0,
+            isMainMap: true
+        }];
         
-        const tilesetImg = this.tilesetManager.getTilesetImage(currentMap.tileset);
-        const blockDefs = this.tilesetManager.getBlockDefinition(currentMap.tileset, 0); // We'll need all blocks
-        
-        const scale = this.viewportState.getScale();
-        const offset = this.viewportState.getOffset();
-        
-        const mapWidthPixels = currentMap.width * BLOCK_SIZE * TILE_SIZE;
-        const mapHeightPixels = currentMap.height * BLOCK_SIZE * TILE_SIZE;
-        
-        // Calculate visible area
-        const startX = Math.max(0, Math.floor(-offset.x / (BLOCK_SIZE * TILE_SIZE * scale)));
-        const startY = Math.max(0, Math.floor(-offset.y / (BLOCK_SIZE * TILE_SIZE * scale)));
-        const endX = Math.min(currentMap.width - 1, Math.ceil((this.renderer.getWidth() - offset.x) / (BLOCK_SIZE * TILE_SIZE * scale)));
-        const endY = Math.min(currentMap.height - 1, Math.ceil((this.renderer.getHeight() - offset.y) / (BLOCK_SIZE * TILE_SIZE * scale)));
-        
-        // Render map blocks with actual tiles
-        const allBlockDefs = this.tilesetManager.tilesetBlockDefinitions[currentMap.tileset];
-        
-        // Debug: Log unique block IDs being rendered (once per map load)
-        if (!this._loggedBlockIds) {
-            const uniqueBlocks = new Set();
-            for (let y = startY; y <= endY; y++) {
-                for (let x = startX; x <= endX; x++) {
-                    const idx = y * currentMap.width + x;
-                    if (currentMap.blockData[idx] !== undefined) {
-                        uniqueBlocks.add(currentMap.blockData[idx]);
+        // Helper to calculate map position based on connection data
+        const addConnectedMap = async (direction, baseOffsetX, baseOffsetY) => {
+            if (!currentMap.connections[direction] || !currentMap.connectionHeaders[direction]) {
+                return;
+            }
+            
+            const header = currentMap.connectionHeaders[direction];
+            const connectedMapId = header.connectedMap;
+            
+            // Load the connected map
+            const connectedMap = await this.mapDataManager.loadMapByIndex(connectedMapId);
+            if (!connectedMap) return;
+            
+            // Ensure tileset is loaded for connected map
+            if (!this.tilesetManager.hasTileset(connectedMap.tileset)) {
+                await this.tilesetManager.loadTileset(connectedMap.tileset, connectedMap.tilesetName);
+            }
+            
+            // Ensure block definitions are loaded for alignment analysis
+            if (!this.tilesetManager.hasBlockDefinitions(connectedMap.tileset)) {
+                await this.tilesetManager.loadTilesetBlocks(connectedMap.tileset);
+            }
+            if (!this.tilesetManager.hasBlockDefinitions(currentMap.tileset)) {
+                await this.tilesetManager.loadTilesetBlocks(currentMap.tileset);
+            }
+            
+            // Calculate optimal alignment based on walkable tiles
+            let alignmentOffset;
+            if (direction === 'north' || direction === 'south') {
+                alignmentOffset = await this.connectionAligner.calculateOptimalAlignment(
+                    currentMap,
+                    connectedMap,
+                    direction,
+                    header.xAlignment
+                );
+            } else {
+                alignmentOffset = await this.connectionAligner.calculateOptimalAlignment(
+                    currentMap,
+                    connectedMap,
+                    direction,
+                    header.yAlignment
+                );
+            }
+            
+            // Calculate position in blocks (32x32 pixels per block)
+            let offsetX = baseOffsetX;
+            let offsetY = baseOffsetY;
+            
+            if (direction === 'north') {
+                offsetY = -connectedMap.height; // Place above
+                offsetX = alignmentOffset; // Use optimized alignment
+            } else if (direction === 'south') {
+                offsetY = currentMap.height; // Place below
+                offsetX = alignmentOffset;
+            } else if (direction === 'west') {
+                offsetX = -connectedMap.width; // Place to left
+                offsetY = alignmentOffset; // Use optimized alignment
+            } else if (direction === 'east') {
+                offsetX = currentMap.width; // Place to right
+                offsetY = alignmentOffset;
+            }
+            
+            result.push({
+                map: connectedMap,
+                offsetX: offsetX,
+                offsetY: offsetY,
+                direction: direction,
+                isMainMap: false
+            });
+            
+            // Recursively load connected maps from this map (1 level deep for now)
+            // This allows seamless world exploration
+            if (connectedMap.connections && connectedMap.connectionHeaders) {
+                const directions = ['north', 'south', 'east', 'west'];
+                for (const subDir of directions) {
+                    if (connectedMap.connections[subDir] && connectedMap.connectionHeaders[subDir]) {
+                        const subHeader = connectedMap.connectionHeaders[subDir];
+                        const subConnectedMapId = subHeader.connectedMap;
+                        
+                        // Don't re-add the main map or already added maps
+                        if (subConnectedMapId === currentMap.mapId) continue;
+                        if (result.find(r => r.map.mapId === subConnectedMapId)) continue;
+                        
+                        const subMap = await this.mapDataManager.loadMapByIndex(subConnectedMapId);
+                        if (!subMap) continue;
+                        
+                        if (!this.tilesetManager.hasTileset(subMap.tileset)) {
+                            await this.tilesetManager.loadTileset(subMap.tileset, subMap.tilesetName);
+                        }
+                        
+                        let subOffsetX = offsetX;
+                        let subOffsetY = offsetY;
+                        
+                        if (subDir === 'north') {
+                            subOffsetY = offsetY - subMap.height;
+                            subOffsetX = offsetX + subHeader.xAlignment;
+                        } else if (subDir === 'south') {
+                            subOffsetY = offsetY + connectedMap.height;
+                            subOffsetX = offsetX + subHeader.xAlignment;
+                        } else if (subDir === 'west') {
+                            subOffsetX = offsetX - subMap.width;
+                            subOffsetY = offsetY + subHeader.yAlignment;
+                        } else if (subDir === 'east') {
+                            subOffsetX = offsetX + connectedMap.width;
+                            subOffsetY = offsetY + subHeader.yAlignment;
+                        }
+                        
+                        result.push({
+                            map: subMap,
+                            offsetX: subOffsetX,
+                            offsetY: subOffsetY,
+                            direction: `${direction}-${subDir}`,
+                            isMainMap: false
+                        });
                     }
                 }
             }
-            console.log(`[MapViewer] Rendering ${uniqueBlocks.size} unique blocks:`, Array.from(uniqueBlocks).sort((a,b) => a-b));
-            this._loggedBlockIds = true;
+        };
+        
+        // Load directly connected maps
+        if (currentMap.connections && currentMap.connectionHeaders) {
+            if (currentMap.connections.north) {
+                await addConnectedMap('north', 0, 0);
+            }
+            if (currentMap.connections.south) {
+                await addConnectedMap('south', 0, 0);
+            }
+            if (currentMap.connections.west) {
+                await addConnectedMap('west', 0, 0);
+            }
+            if (currentMap.connections.east) {
+                await addConnectedMap('east', 0, 0);
+            }
         }
         
+        return result;
+    }
+    
+    /**
+     * Render a single map at a specific offset
+     */
+    /**
+     * Render a map at a specific offset (used for main map and connected maps)
+     * 
+     * Collision Indicator Colors (when overlays enabled):
+     * - 🌿 Bright Green (0.4 alpha): GRASS - Wild Pokemon encounter zones
+     * - 🌊 Blue (0.35 alpha): WATER - Requires Surf ability
+     * - ⬇️ Orange (0.4 alpha): LEDGE - One-way jumpable ledges
+     * - 🟪 Magenta (0.35 alpha): WARP_CARPET - Warp zones (Pokemon Center/Mart mats)
+     * - 🚪 Purple (0.4 alpha): DOOR - Building entrances/exits
+     * - 🟨 Yellow (0.35 alpha): COUNTER - Blocks movement but allows interaction
+     * - 🌸 Cyan (0.25 alpha): FLOWER - Decorative walkable tiles
+     * - ✅ Light Green (0.2 alpha): PASSABLE - Regular walkable ground
+     * - 🧱 RED (0.3 alpha): IMPASSABLE - Walls, obstacles, tiles without collision data
+     * 
+     * @param {Object} mapData - Map data to render
+     * @param {number} offsetXBlocks - X offset in blocks
+     * @param {number} offsetYBlocks - Y offset in blocks
+     * @param {number} scale - Rendering scale
+     * @param {Object} viewportOffset - Viewport offset {x, y}
+     * @param {boolean} isMainMap - Whether this is the main map (collision indicators only shown for main map)
+     */
+    renderMapAtOffset(mapData, offsetXBlocks, offsetYBlocks, scale, viewportOffset, isMainMap = false) {
+        const tilesetImg = this.tilesetManager.getTilesetImage(mapData.tileset);
+        const allBlockDefs = this.tilesetManager.tilesetBlockDefinitions[mapData.tileset];
+        
+        if (!allBlockDefs || !tilesetImg) {
+            return;
+        }
+        
+        // Calculate this map's position in pixels
+        const mapOffsetX = offsetXBlocks * BLOCK_SIZE * TILE_SIZE * scale;
+        const mapOffsetY = offsetYBlocks * BLOCK_SIZE * TILE_SIZE * scale;
+        
+        // Calculate visible area for this specific map (or render all if optimization disabled)
+        let startX, startY, endX, endY;
+        if (this.tileOptimizationEnabled) {
+            startX = Math.max(0, Math.floor((-viewportOffset.x - mapOffsetX) / (BLOCK_SIZE * TILE_SIZE * scale)));
+            startY = Math.max(0, Math.floor((-viewportOffset.y - mapOffsetY) / (BLOCK_SIZE * TILE_SIZE * scale)));
+            endX = Math.min(mapData.width - 1, Math.ceil((this.renderer.getWidth() - viewportOffset.x - mapOffsetX) / (BLOCK_SIZE * TILE_SIZE * scale)));
+            endY = Math.min(mapData.height - 1, Math.ceil((this.renderer.getHeight() - viewportOffset.y - mapOffsetY) / (BLOCK_SIZE * TILE_SIZE * scale)));
+            
+            // Only render if this map is visible in viewport
+            if (startX > mapData.width || startY > mapData.height || endX < 0 || endY < 0) {
+                return;
+            }
+        } else {
+            // Render entire map without optimization
+            startX = 0;
+            startY = 0;
+            endX = mapData.width - 1;
+            endY = mapData.height - 1;
+        }
+        
+        // Get animation type for this tileset
+        const animationType = this.tilesetManager.getAnimationTypeValue(mapData.tileset);
+        
+        // Get or create optimized tileset for current scale (only if optimization enabled)
+        const optimizedTileset = this.tileOptimizationEnabled 
+            ? this.tilesetManager.getOptimizedTileset(mapData.tileset, scale)
+            : null;
+        
+        // Render blocks
         for (let blockY = startY; blockY <= endY; blockY++) {
             for (let blockX = startX; blockX <= endX; blockX++) {
-                const blockIndex = blockY * currentMap.width + blockX;
-                const blockId = currentMap.blockData[blockIndex];
+                const blockIndex = blockY * mapData.width + blockX;
+                const blockId = mapData.blockData[blockIndex];
                 
-                if (blockId === undefined || !allBlockDefs || !allBlockDefs[blockId]) continue;
+                if (blockId === undefined || !allBlockDefs[blockId]) {
+                    continue;
+                }
                 
                 const blockDef = allBlockDefs[blockId];
-                const screenBlockX = offset.x + blockX * BLOCK_SIZE * TILE_SIZE * scale;
-                const screenBlockY = offset.y + blockY * BLOCK_SIZE * TILE_SIZE * scale;
+                const screenBlockX = viewportOffset.x + mapOffsetX + blockX * BLOCK_SIZE * TILE_SIZE * scale;
+                const screenBlockY = viewportOffset.y + mapOffsetY + blockY * BLOCK_SIZE * TILE_SIZE * scale;
                 
-                // Each block is 4x4 tiles
+                // Render 4x4 tiles for this block
                 for (let tileY = 0; tileY < BLOCK_SIZE; tileY++) {
                     for (let tileX = 0; tileX < BLOCK_SIZE; tileX++) {
-                        // Get tile ID from block's 4x4 structure
+                        // Access 2D array structure: tiles[row][col]
                         const tileId = blockDef.tiles[tileY][tileX];
                         
                         if (tileId === undefined) continue;
                         
-                        // Calculate tile position in tileset (16 tiles per row)
-                        const srcX = (tileId % 16) * TILE_SIZE;
-                        const srcY = Math.floor(tileId / 16) * TILE_SIZE;
-                        
-                        // Calculate screen position
-                        const destX = screenBlockX + tileX * TILE_SIZE * scale;
-                        const destY = screenBlockY + tileY * TILE_SIZE * scale;
-                        const destSize = TILE_SIZE * scale;
-                        
-                        // Draw tile from tileset
-                        this.renderer.drawImage(
-                            tilesetImg,
-                            srcX, srcY, TILE_SIZE, TILE_SIZE,
-                            destX, destY, destSize, destSize
-                        );
-                    }
-                }
-                
-                // Draw collision overlay using NEW tile-based collision system
-                if (this.showOverlays) {
-                    const blockDef = this.tilesetManager.getBlockDefinition(currentMap.tileset, blockId);
-                    
-                    if (blockDef && blockDef.tiles) {
                         const tileSize = TILE_SIZE * scale;
-                        const borderWidth = Math.max(1, Math.floor(scale * 0.5));
+                        const screenX = screenBlockX + tileX * tileSize;
+                        const screenY = screenBlockY + tileY * tileSize;
                         
-                        // Check each tile in the 4x4 block
-                        for (let tileRow = 0; tileRow < 4; tileRow++) {
-                            for (let tileCol = 0; tileCol < 4; tileCol++) {
-                                const tileId = blockDef.tiles[tileRow][tileCol];
-                                
-                                // Determine overlay color based on tile properties
-                                let overlayColor = null;
-                                let alpha = 0.3;
-                                
-                                // Check tile passability
-                                const isPassable = this.tilesetManager.isTilePassable(currentMap.tileset, tileId);
-                                
-                                // Check tile type (priority: GRASS > FLOWER > WATER > LEDGE > WALL > VOID)
-                                if (this.tilesetManager.isGrassTile(currentMap.tileset, tileId)) {
-                                    // Green for grass tiles (walkable, encounter tiles)
-                                    overlayColor = '#00ff00';
-                                    alpha = 0.25;
-                                } else if (this.tilesetManager.isFlowerTile(currentMap.tileset, tileId)) {
-                                    // Yellow for animated flower tiles (decorative, walkable)
-                                    overlayColor = '#ffff00';
-                                    alpha = 0.3;
-                                } else if (this.tilesetManager.isWaterTile(tileId)) {
-                                    // Blue for water tiles
-                                    overlayColor = '#0044cc';
-                                    alpha = 0.4;
-                                } else if (this.tilesetManager.isLedgeTile(tileId)) {
-                                    // Orange for ledge tiles (jumpable down)
-                                    overlayColor = '#ff8800';
-                                    alpha = 0.4;
-                                } else if (!isPassable) {
-                                    // Red for impassable tiles (walls, void, obstacles)
-                                    overlayColor = '#ff0000';
-                                    alpha = 0.3;
-                                }
-                                
-                                // Draw overlay border if there's a color
-                                if (overlayColor) {
-                                    const tileX = screenBlockX + tileCol * tileSize;
-                                    const tileY = screenBlockY + tileRow * tileSize;
-                                    this.renderer.setAlpha(alpha * 1.5);
-                                    this.renderer.drawRect(tileX, tileY, tileSize, tileSize, overlayColor, false, borderWidth);
-                                    this.renderer.resetAlpha();
-                                }
+                        // Check if this tile should be animated (disable at very small scales for performance)
+                        let animatedTileCanvas = null;
+                        if (scale >= 0.5) {
+                            animatedTileCanvas = this.tileAnimator.renderAnimatedTile(
+                                tilesetImg,
+                                tileId,
+                                animationType,
+                                scale
+                            );
+                        }
+                        
+                        if (animatedTileCanvas) {
+                            // Draw animated tile from cached canvas
+                            this.renderer.drawImage(
+                                animatedTileCanvas,
+                                0, 0, animatedTileCanvas.width, animatedTileCanvas.height,
+                                screenX, screenY, tileSize, tileSize
+                            );
+                        } else {
+                            // Use optimized tileset for current scale
+                            const tilesetToUse = optimizedTileset || tilesetImg;
+                            const srcX = (tileId % 16) * TILE_SIZE;
+                            const srcY = Math.floor(tileId / 16) * TILE_SIZE;
+                            
+                            this.renderer.drawImage(
+                                tilesetToUse,
+                                srcX, srcY, TILE_SIZE, TILE_SIZE,
+                                screenX, screenY, tileSize, tileSize
+                            );
+                        }
+                        
+                        // Render collision indicators ONLY for the main map (and skip at very small scales)
+                        if (isMainMap && this.showOverlays && scale >= 0.75) {
+                            // Analyze tile collision type
+                            const isPassable = this.tilesetManager.isTilePassable(mapData.tileset, tileId);
+                            const isGrass = this.tilesetManager.isGrassTile(mapData.tileset, tileId);
+                            const isWater = this.tilesetManager.isWaterTile(tileId);
+                            const isLedge = this.tilesetManager.isLedgeTile(tileId);
+                            const isFlower = this.tilesetManager.isFlowerTile(mapData.tileset, tileId);
+                            const isDoor = this.tilesetManager.isDoorTile(tileId);
+                            const isWarpCarpet = this.tilesetManager.isWarpCarpetTile(tileId);
+                            const isCounter = this.tilesetManager.isCounterTile(tileId);
+                            
+                            // Determine collision overlay color based on tile type (priority order)
+                            let overlayColor = null;
+                            let overlayAlpha = 0.3;
+                            
+                            if (isGrass) {
+                                // Grass tiles - bright green (encounter zones)
+                                overlayColor = 'rgba(0, 255, 0, 1.0)';
+                                overlayAlpha = 0.4;
+                            } else if (isWater) {
+                                // Water tiles - blue (surfable)
+                                overlayColor = 'rgba(0, 100, 255, 1.0)';
+                                overlayAlpha = 0.35;
+                            } else if (isLedge) {
+                                // Ledge tiles - orange (one-way, jumpable)
+                                overlayColor = 'rgba(255, 140, 0, 1.0)';
+                                overlayAlpha = 0.4;
+                            } else if (isWarpCarpet) {
+                                // Warp carpet tiles - magenta (walkable warp zones)
+                                overlayColor = 'rgba(255, 0, 255, 1.0)';
+                                overlayAlpha = 0.35;
+                            } else if (isDoor) {
+                                // Door tiles - purple (entrance/exit)
+                                overlayColor = 'rgba(128, 0, 255, 1.0)';
+                                overlayAlpha = 0.4;
+                            } else if (isCounter) {
+                                // Counter tiles - yellow (blocks but interactive)
+                                overlayColor = 'rgba(255, 255, 0, 1.0)';
+                                overlayAlpha = 0.35;
+                            } else if (isFlower) {
+                                // Flower/decoration tiles - cyan (walkable decoration)
+                                overlayColor = 'rgba(0, 255, 255, 1.0)';
+                                overlayAlpha = 0.25;
+                            } else if (isPassable) {
+                                // Regular walkable tiles - light green
+                                overlayColor = 'rgba(100, 255, 100, 1.0)';
+                                overlayAlpha = 0.2;
+                            } else {
+                                // Impassable tiles (walls, obstacles) - RED
+                                // This includes tiles with NO collision data
+                                overlayColor = 'rgba(255, 0, 0, 1.0)';
+                                overlayAlpha = 0.3;
+                            }
+                            
+                            // Draw collision overlay
+                            if (overlayColor) {
+                                this.renderer.setAlpha(overlayAlpha);
+                                this.renderer.drawRect(screenX, screenY, tileSize, tileSize, overlayColor, true);
+                                this.renderer.resetAlpha();
                             }
                         }
                     }
                 }
-                
-                // Draw block coordinates for debugging (when zoomed in enough and if enabled)
-                if (scale >= 2 && this.showCoordLabels) {
-                    const blockSize = BLOCK_SIZE * TILE_SIZE * scale;
-                    const coordFontSize = Math.max(7, Math.min(10, blockSize * 0.2));
-                    const coordText = `${blockX},${blockY}`;
-                    
-                    // Draw with outline for visibility
-                    this.renderer.drawText(coordText, screenBlockX + 2, screenBlockY + 2, {
-                        font: `${coordFontSize}px "Courier New"`,
-                        color: '#ffff00',
-                        align: 'left',
-                        baseline: 'top',
-                        shadow: true
-                    });
-                }
             }
         }
+    }
+    
+    // This will be continued in the next part...
+    async render() {
+        // Prevent concurrent render calls
+        if (this.isRendering) {
+            return;
+        }
+        this.isRendering = true;
         
-        // Render overlays (warps, signs, NPCs)
+        try {
+            const currentMap = this.mapState.getCurrentMap();
+            if (!currentMap) {
+                this.isRendering = false;
+                return;
+            }
+            if (!this.tilesetManager.hasTileset(currentMap.tileset)) {
+                this.isRendering = false;
+                return;
+            }
+            
+            // Clear canvas
+            this.renderer.clear('#000');
+            
+            const scale = this.viewportState.getScale();
+            const offset = this.viewportState.getOffset();
+            
+            // Check if we're in interior layout mode
+            if (this.showingInteriorLayout && this.interiorLayoutManager) {
+                const layout = this.interiorLayoutManager.getCurrentLayout();
+                if (layout) {
+                    // Render interior layout with main map highlighting
+                    this.interiorRenderer.renderInteriorLayout(
+                        layout,
+                        scale,
+                        offset.x,
+                        offset.y,
+                        currentMap.mapId
+                    );
+                    
+                    // Render overlays and sprites for the main map only
+                    // Calculate the main room's position in the layout
+                    const mainRoom = layout.rooms.find(room => room.mapData.mapId === currentMap.mapId);
+                    
+                    if (mainRoom) {
+                        // Calculate offset for the main room within the layout
+                        const mainRoomOffsetX = offset.x + (mainRoom.offsetX * BLOCK_SIZE * TILE_SIZE * scale);
+                        const mainRoomOffsetY = offset.y + (mainRoom.offsetY * BLOCK_SIZE * TILE_SIZE * scale);
+                        const mainRoomOffset = { x: mainRoomOffsetX, y: mainRoomOffsetY };
+                        
+                        // Render overlays (warps, signs, NPCs) for main map
+                        if (this.showOverlays) {
+                            this.renderOverlays(currentMap, mainRoomOffset, scale);
+                        }
+                        
+                        // ALWAYS render sprites for main map
+                        this.renderSprites(currentMap, mainRoomOffset, scale);
+                    }
+                    
+                    // Draw grid if enabled (same as normal mode)
+                    if (this.showGrid && scale >= 2) {
+                        this.renderInteriorLayoutGrid(layout, scale, offset);
+                    }
+                    
+                    this.isRendering = false;
+                    return;
+                }
+            }
+            
+            // Normal rendering mode
+            // For interior maps (no border connections), render only the current map
+            // For outdoor maps (with border connections), render with connected maps
+            const isInteriorMap = !currentMap.connections || 
+                                 (!currentMap.connections.north && 
+                                  !currentMap.connections.south && 
+                                  !currentMap.connections.east && 
+                                  !currentMap.connections.west);
+            
+            if (isInteriorMap) {
+                // Interior map: Render only the single current map
+                this.renderMapAtOffset(currentMap, 0, 0, scale, offset, true);
+            } else {
+                // Outdoor map: Render with connected maps
+                let connectedMaps;
+                try {
+                    connectedMaps = await this.getVisibleConnectedMaps();
+                } catch (error) {
+                    console.error('Failed to load connected maps, rendering main map only:', error);
+                    // Fallback: just render the main map
+                    connectedMaps = [{
+                        map: currentMap,
+                        offsetX: 0,
+                        offsetY: 0,
+                        isMainMap: true
+                    }];
+                }
+                
+                if (!connectedMaps || connectedMaps.length === 0) {
+                    this.isRendering = false;
+                    return;
+                }
+                
+                // Render all maps (main + connected)
+                for (const { map, offsetX, offsetY, isMainMap } of connectedMaps) {
+                    this.renderMapAtOffset(map, offsetX, offsetY, scale, offset, isMainMap);
+                }
+            }
+        
+        // Now render overlays, sprites, etc only for the main map
+        // (We could extend this to render sprites from connected maps too)
+        
+        const allBlockDefs = this.tilesetManager.tilesetBlockDefinitions[currentMap.tileset];
+        
+        // Render overlays (warps, signs, NPCs) - only for main map
         if (this.showOverlays) {
             this.renderOverlays(currentMap, offset, scale);
             this.renderBoundaryConnections(currentMap, offset, scale);
@@ -355,6 +782,12 @@ export class MapViewer {
         
         // Draw grid if enabled
         if (this.showGrid && scale >= 2) {
+            // Calculate visible blocks for grid
+            const startX = Math.floor(-offset.x / (BLOCK_SIZE * TILE_SIZE * scale));
+            const startY = Math.floor(-offset.y / (BLOCK_SIZE * TILE_SIZE * scale));
+            const endX = Math.ceil((this.renderer.getWidth() - offset.x) / (BLOCK_SIZE * TILE_SIZE * scale));
+            const endY = Math.ceil((this.renderer.getHeight() - offset.y) / (BLOCK_SIZE * TILE_SIZE * scale));
+            
             this.renderer.setAlpha(0.15);
             for (let x = startX; x <= endX; x++) {
                 const screenX = offset.x + x * BLOCK_SIZE * TILE_SIZE * scale;
@@ -377,6 +810,11 @@ export class MapViewer {
         this.renderer.drawRect(mapBoundaryX, mapBoundaryY, mapBoundaryWidth, mapBoundaryHeight, '#ff0', false);
         this.renderer.drawRect(mapBoundaryX - 1, mapBoundaryY - 1, mapBoundaryWidth + 2, mapBoundaryHeight + 2, '#f00', false);
         this.renderer.resetAlpha();
+        
+        } finally {
+            // Always release the rendering lock
+            this.isRendering = false;
+        }
     }
     
     renderOverlays(currentMap, offset, scale) {
@@ -431,67 +869,99 @@ export class MapViewer {
     
     /**
      * Get sprite facing direction and frame info
-     * Sprite sheet layout: 48x16 with 3 frames (down=0, up=16, left=32)
-     * Right is mirrored from left frame
+     * Sprite sheet layout: 48x16 pixels (3 frames horizontally, 1 standing frame per direction)
+     * - Frame 0 (x=0-15, y=0-15): DOWN facing
+     * - Frame 1 (x=16-31, y=0-15): UP facing  
+     * - Frame 2 (x=32-47, y=0-15): LEFT facing (RIGHT uses this with horizontal flip)
+     * 
      * @param {Object} sprite - Sprite data from map
-     * @returns {Object} - {facing: 'down'|'up'|'left'|'right', frameX: number, mirror: boolean}
+     * @param {number} facingDirection - Facing direction from movement engine (0=DOWN, 4=UP, 8=LEFT, 12=RIGHT)
+     * @param {number} animFrame - Animation frame (0-3, where 0 = standing)
+     * @param {boolean} isWalking - Whether sprite is currently walking
+     * @returns {Object} - {facing: string, frameX: number, frameY: number, mirror: boolean}
      */
-    getSpriteFrame(sprite, facingDirection = 0, animFrame = 0, isWalking = false) {
-        // If movement engine provides facing direction, use it
-        if (facingDirection !== undefined) {
-            // Pokemon Red sprite facing directions:
-            // 0 = DOWN, 4 = UP, 8 = LEFT, 12 = RIGHT
-            let frameX = 0;
-            let mirror = false;
-            
-            if (facingDirection === 0) { // DOWN
-                frameX = 0;
-            } else if (facingDirection === 4) { // UP
-                frameX = 16;
-            } else if (facingDirection === 8) { // LEFT
-                frameX = 32;
-            } else if (facingDirection === 12) { // RIGHT
-                frameX = 32;
-                mirror = true;
-            }
-            
-            // Apply walking animation if sprite is walking
-            // Pokemon Red has 4 animation frames per direction
-            if (isWalking && animFrame > 0) {
-                // Slight frame offset for walking animation
-                // This would need actual sprite sheet layout info
-                // For now, just use the base frame
-            }
-            
-            return {
-                facing: facingDirection === 0 ? 'down' : facingDirection === 4 ? 'up' : facingDirection === 8 ? 'left' : 'right',
-                frameX: frameX,
-                mirror: mirror
-            };
-        }
+    getSpriteFrame(sprite, facingDirection = null, animFrame = 0, isWalking = false) {
+        // Determine facing direction from various sources
+        let facing = 0; // Default to DOWN (0)
         
-        // Fallback: Check if sprite has movement data with direction
-        if (sprite.movement && sprite.movement.direction) {
-            const dir = sprite.movement.direction;
-            switch (dir) {
-                case 'UP':
-                    return { facing: 'up', frameX: 16, mirror: false };
+        // Priority 1: Check raw byte2 for STAY movement FIRST (0xD0-0xD3 are facing directions)
+        // This is more reliable than the movement engine for stationary sprites
+        if (sprite.movement && sprite.movement.byte1 === 0xFF && sprite.movement.byte2 >= 0xD0 && sprite.movement.byte2 <= 0xD3) {
+            // STAY movement with explicit facing direction
+            // 0xD0 = DOWN, 0xD1 = UP, 0xD2 = LEFT, 0xD3 = RIGHT
+            switch (sprite.movement.byte2) {
+                case 0xD0:
+                    facing = 0x00; // SPRITE_FACING_DOWN
+                    break;
+                case 0xD1:
+                    facing = 0x04; // SPRITE_FACING_UP
+                    break;
+                case 0xD2:
+                    facing = 0x08; // SPRITE_FACING_LEFT
+                    break;
+                case 0xD3:
+                    facing = 0x0C; // SPRITE_FACING_RIGHT
+                    break;
+            }
+        }
+        // Priority 2: Movement engine provides facing direction (for moving sprites)
+        else if (facingDirection !== null && facingDirection !== undefined) {
+            facing = facingDirection;
+        }
+        // Priority 3: Sprite data has movement direction string
+        else if (sprite.movement && sprite.movement.direction) {
+            // Map string direction to numeric facing values
+            switch (sprite.movement.direction) {
                 case 'DOWN':
-                    return { facing: 'down', frameX: 0, mirror: false };
+                    facing = 0x00; // SPRITE_FACING_DOWN
+                    break;
+                case 'UP':
+                    facing = 0x04; // SPRITE_FACING_UP
+                    break;
                 case 'LEFT':
-                    return { facing: 'left', frameX: 32, mirror: false };
+                    facing = 0x08; // SPRITE_FACING_LEFT
+                    break;
                 case 'RIGHT':
-                    return { facing: 'right', frameX: 32, mirror: true };
+                    facing = 0x0C; // SPRITE_FACING_RIGHT
+                    break;
+                case 'NONE':
                 default:
-                    return { facing: 'down', frameX: 0, mirror: false };
+                    facing = 0x00; // Default to DOWN
+                    break;
             }
         }
         
-        // Default to facing down
+        // Map facing direction to sprite sheet position
+        // Sprites are 48x16 with 3 frames horizontally: DOWN (x=0), UP (x=16), LEFT (x=32)
+        // Each frame is 16x16 pixels (standing pose only, no walking animation in extracted sprites)
+        let frameX = 0;
+        let frameY = 0; // Always 0 since sprites are single row
+        let mirror = false;
+        let facingName = 'down';
+        
+        if (facing === 0x00) { // DOWN
+            frameX = 0;
+            facingName = 'down';
+        } else if (facing === 0x04) { // UP
+            frameX = 16;
+            facingName = 'up';
+        } else if (facing === 0x08) { // LEFT
+            frameX = 32;
+            facingName = 'left';
+        } else if (facing === 0x0C) { // RIGHT
+            frameX = 32; // Use left frame at x=32
+            mirror = true; // but flip it horizontally
+            facingName = 'right';
+        }
+        
+        // Note: animFrame and isWalking are ignored since extracted sprites only have standing poses
+        // The walking animation would require extracting additional frames from the ROM
+        
         return {
-            facing: 'down',
-            frameX: 0,
-            mirror: false
+            facing: facingName,
+            frameX: frameX,
+            frameY: frameY,
+            mirror: mirror
         };
     }
     
@@ -633,7 +1103,7 @@ export class MapViewer {
                 // Use movement engine position if available, otherwise use static position
                 let spriteX = sprite.x;
                 let spriteY = sprite.y;
-                let facingDirection = 0; // Default facing down
+                let facingDirection = null; // Will be determined from sprite data if not provided by movement engine
                 let animFrame = 0;
                 let isWalking = false;
                 
@@ -641,7 +1111,11 @@ export class MapViewer {
                     const pos = spritePositions[index];
                     spriteX = pos.pixelX / 16; // Convert pixels back to tiles
                     spriteY = pos.pixelY / 16;
-                    facingDirection = pos.facingDirection;
+                    // Only use movement engine facing if sprite is actually walking
+                    // For STAY sprites, leave facingDirection as null so ROM data is used
+                    if (pos.isWalking) {
+                        facingDirection = pos.facingDirection;
+                    }
                     animFrame = pos.animFrame;
                     isWalking = pos.isWalking;
                 }
@@ -679,14 +1153,14 @@ export class MapViewer {
                         this.renderer.scale(-1, 1);
                         this.renderer.drawImage(
                             spriteImg,
-                            frameInfo.frameX, 0, 16, 16,  // Source frame
+                            frameInfo.frameX, frameInfo.frameY, 16, 16,  // Source frame (x, y, width, height)
                             0, 0, size, size              // Draw at 0,0 due to transform
                         );
                     } else {
                         // Draw normally
                         this.renderer.drawImage(
                             spriteImg,
-                            frameInfo.frameX, 0, 16, 16,  // Source frame
+                            frameInfo.frameX, frameInfo.frameY, 16, 16,  // Source frame (x, y, width, height)
                             x, y, size, size
                         );
                     }
@@ -699,13 +1173,34 @@ export class MapViewer {
                         this.renderer.drawRect(x, y, size, size, 'rgba(50, 255, 50, 1.0)', true);
                         this.renderer.resetAlpha();
                         
-                        // Draw N label
+                        // Draw N label in center
                         const fontSize = Math.max(12, Math.min(20, size * 0.4));
                         this.renderer.drawText('N', x + size / 2, y + size / 2, {
                             font: `bold ${fontSize}px "Courier New"`,
                             color: '#fff',
                             align: 'center',
                             baseline: 'middle',
+                            shadow: true
+                        });
+                        
+                        // Draw facing direction in top-left corner
+                        const facingShort = frameInfo.facing.charAt(0).toUpperCase(); // D/U/L/R
+                        const smallFontSize = Math.max(8, Math.min(12, size * 0.25));
+                        this.renderer.drawText(facingShort, x + 3, y + 3, {
+                            font: `bold ${smallFontSize}px "Courier New"`,
+                            color: '#ffff00',
+                            align: 'left',
+                            baseline: 'top',
+                            shadow: true
+                        });
+                        
+                        // Draw frame index in top-right corner
+                        const frameIdx = Math.floor(frameInfo.frameX / 16); // 0, 1, or 2
+                        this.renderer.drawText(frameIdx.toString(), x + size - 3, y + 3, {
+                            font: `bold ${smallFontSize}px "Courier New"`,
+                            color: '#00ffff',
+                            align: 'right',
+                            baseline: 'top',
                             shadow: true
                         });
                     }
@@ -734,6 +1229,37 @@ export class MapViewer {
                 }
             });
         }
+    }
+    
+    /**
+     * Render grid overlay for interior layout mode
+     * @param {Object} layout - Interior layout data
+     * @param {number} scale - Render scale
+     * @param {Object} offset - Camera offset {x, y}
+     */
+    renderInteriorLayoutGrid(layout, scale, offset) {
+        // Draw universal grid overlay (same as normal mode)
+        // Calculate visible blocks for grid based on viewport
+        const startX = Math.floor(-offset.x / (BLOCK_SIZE * TILE_SIZE * scale));
+        const startY = Math.floor(-offset.y / (BLOCK_SIZE * TILE_SIZE * scale));
+        const endX = Math.ceil((this.renderer.getWidth() - offset.x) / (BLOCK_SIZE * TILE_SIZE * scale));
+        const endY = Math.ceil((this.renderer.getHeight() - offset.y) / (BLOCK_SIZE * TILE_SIZE * scale));
+        
+        this.renderer.setAlpha(0.15);
+        
+        // Draw vertical grid lines across entire viewport
+        for (let x = startX; x <= endX; x++) {
+            const screenX = offset.x + x * BLOCK_SIZE * TILE_SIZE * scale;
+            this.renderer.drawLine(screenX, 0, screenX, this.renderer.getHeight(), '#fff', 1);
+        }
+        
+        // Draw horizontal grid lines across entire viewport
+        for (let y = startY; y <= endY; y++) {
+            const screenY = offset.y + y * BLOCK_SIZE * TILE_SIZE * scale;
+            this.renderer.drawLine(0, screenY, this.renderer.getWidth(), screenY, '#fff', 1);
+        }
+        
+        this.renderer.resetAlpha();
     }
     
     renderBoundaryConnections(currentMap, offset, scale) {
@@ -780,16 +1306,72 @@ export class MapViewer {
         let mouseDownY = 0;
         
         this.canvas.addEventListener('mousedown', (e) => {
-            this.isDragging = true;
             hasDragged = false;
             mouseDownX = e.clientX;
             mouseDownY = e.clientY;
             this.dragStart = { x: e.clientX, y: e.clientY };
+            
+            // Check for Ctrl+Click for room dragging in interior layout mode
+            if (e.ctrlKey && this.showingInteriorLayout && this.interiorLayoutManager) {
+                const layout = this.interiorLayoutManager.getCurrentLayout();
+                if (layout) {
+                    const rect = this.canvas.getBoundingClientRect();
+                    const canvasX = e.clientX - rect.left;
+                    const canvasY = e.clientY - rect.top;
+                    const offset = this.viewportState.getOffset();
+                    const scale = this.viewportState.getScale();
+                    
+                    // Find which room was clicked
+                    const clickedRoom = this.findRoomAtPosition(canvasX, canvasY, layout, offset, scale);
+                    if (clickedRoom) {
+                        this.isRoomDragging = true;
+                        this.draggedRoom = clickedRoom;
+                        
+                        // Calculate offset from room origin to mouse position
+                        const roomScreenX = (clickedRoom.offsetX * BLOCK_SIZE * TILE_SIZE * scale) + offset.x;
+                        const roomScreenY = (clickedRoom.offsetY * BLOCK_SIZE * TILE_SIZE * scale) + offset.y;
+                        this.roomDragOffset = {
+                            x: canvasX - roomScreenX,
+                            y: canvasY - roomScreenY
+                        };
+                        
+                        this.canvas.style.cursor = 'move';
+                        return;
+                    }
+                }
+            }
+            
+            // Normal dragging (panning)
+            this.isDragging = true;
             this.canvas.style.cursor = 'grabbing';
         });
         
         this.canvas.addEventListener('mousemove', (e) => {
-            if (this.isDragging) {
+            if (this.isRoomDragging && this.draggedRoom) {
+                // Handle room dragging
+                hasDragged = true;
+                
+                const rect = this.canvas.getBoundingClientRect();
+                const canvasX = e.clientX - rect.left;
+                const canvasY = e.clientY - rect.top;
+                const offset = this.viewportState.getOffset();
+                const scale = this.viewportState.getScale();
+                
+                // Calculate new room position
+                const newScreenX = canvasX - this.roomDragOffset.x;
+                const newScreenY = canvasY - this.roomDragOffset.y;
+                
+                // Convert screen position to block offset
+                const newOffsetX = Math.round((newScreenX - offset.x) / (BLOCK_SIZE * TILE_SIZE * scale));
+                const newOffsetY = Math.round((newScreenY - offset.y) / (BLOCK_SIZE * TILE_SIZE * scale));
+                
+                // Update the room's position
+                this.draggedRoom.offsetX = newOffsetX;
+                this.draggedRoom.offsetY = newOffsetY;
+                
+                this.render();
+                this.hideTooltip();
+            } else if (this.isDragging) {
                 const dx = Math.abs(e.clientX - mouseDownX);
                 const dy = Math.abs(e.clientY - mouseDownY);
                 if (dx > 5 || dy > 5) {
@@ -809,6 +1391,22 @@ export class MapViewer {
         });
         
         this.canvas.addEventListener('mouseup', (e) => {
+            if (this.isRoomDragging) {
+                // Save custom positions to localStorage
+                const layout = this.interiorLayoutManager?.currentLayout;
+                if (layout && layout.rooms && layout.rooms.length > 0) {
+                    const mapIds = layout.rooms.map(room => room.mapId);
+                    const groupId = this.interiorLayoutManager.generateGroupId(mapIds);
+                    this.interiorLayoutManager.saveCustomPositions(groupId, layout.rooms);
+                    Logger.info(`✓ Saved custom positions for group: ${groupId}`);
+                }
+                
+                this.isRoomDragging = false;
+                this.draggedRoom = null;
+                this.canvas.style.cursor = 'grab';
+                return;
+            }
+            
             if (!hasDragged && this.showOverlays) {
                 // Handle click on objects
                 this.handleCanvasClick(e);
@@ -819,12 +1417,29 @@ export class MapViewer {
         
         this.canvas.addEventListener('mouseleave', () => {
             this.isDragging = false;
+            this.isRoomDragging = false;
+            this.draggedRoom = null;
             if (this.hoveredTile) {
                 this.hoveredTile = null;
                 this.render();
             }
             this.hideTooltip();
             this.canvas.style.cursor = 'default';
+        });
+        
+        // Keyboard event listeners for Ctrl key (room drag mode)
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'Control' && this.showingInteriorLayout && this.interiorRenderer) {
+                this.interiorRenderer.setShowDragOverlay(true);
+                this.render();
+            }
+        });
+        
+        window.addEventListener('keyup', (e) => {
+            if (e.key === 'Control' && this.interiorRenderer) {
+                this.interiorRenderer.setShowDragOverlay(false);
+                this.render();
+            }
         });
         
         this.canvas.addEventListener('wheel', (e) => {
@@ -861,7 +1476,100 @@ export class MapViewer {
         const offset = this.viewportState.getOffset();
         const scale = this.viewportState.getScale();
         
-        // Convert to TILE coordinates
+        // Check if in interior layout mode
+        if (this.showingInteriorLayout && this.interiorLayoutManager) {
+            const layout = this.interiorLayoutManager.getCurrentLayout();
+            if (layout) {
+                // Check if hovering over a connection line
+                const hoveredConnection = this.getHoveredConnection(canvasX, canvasY, layout, offset, scale);
+                if (hoveredConnection) {
+                    this.canvas.style.cursor = 'help';
+                    this.showConnectionTooltip(e.clientX, e.clientY, hoveredConnection);
+                    // Update renderer with hovered connection for highlighting
+                    if (this.interiorRenderer) {
+                        this.interiorRenderer.setHoveredConnection(hoveredConnection);
+                        this.render();
+                    }
+                    return;
+                } else {
+                    this.hideTooltip();
+                    // Clear hovered connection
+                    if (this.interiorRenderer && this.interiorRenderer.hoveredConnection) {
+                        this.interiorRenderer.setHoveredConnection(null);
+                        this.render();
+                    }
+                }
+                
+                // In interior layout mode, need to account for room offset
+                const mainRoom = layout.rooms.find(room => room.mapData.mapId === currentMap.mapId);
+                if (mainRoom) {
+                    // Adjust offset for the main room's position in the layout
+                    const mainRoomOffsetX = offset.x + (mainRoom.offsetX * BLOCK_SIZE * TILE_SIZE * scale);
+                    const mainRoomOffsetY = offset.y + (mainRoom.offsetY * BLOCK_SIZE * TILE_SIZE * scale);
+                    
+                    // Calculate tile coordinates relative to the main room
+                    const worldTileX = Math.floor((canvasX - mainRoomOffsetX) / (TILE_SIZE * scale));
+                    const worldTileY = Math.floor((canvasY - mainRoomOffsetY) / (TILE_SIZE * scale));
+                    
+                    // Convert tile coordinates to block coordinates
+                    const mapBlockX = Math.floor(worldTileX / BLOCK_SIZE);
+                    const mapBlockY = Math.floor(worldTileY / BLOCK_SIZE);
+                    
+                    // Calculate which tile within the block
+                    const tileXInBlock = worldTileX % BLOCK_SIZE;
+                    const tileYInBlock = worldTileY % BLOCK_SIZE;
+                    const tileIndexInBlock = tileYInBlock * BLOCK_SIZE + tileXInBlock;
+                    
+                    // Check if within main room bounds
+                    if (mapBlockX >= 0 && mapBlockX < currentMap.width && 
+                        mapBlockY >= 0 && mapBlockY < currentMap.height) {
+                        
+                        // Update hovered tile
+                        const newHovered = {
+                            blockX: mapBlockX, 
+                            blockY: mapBlockY,
+                            tileX: tileXInBlock,
+                            tileY: tileYInBlock,
+                            tileIndex: tileIndexInBlock,
+                            worldTileX: worldTileX,
+                            worldTileY: worldTileY
+                        };
+                        
+                        if (!this.hoveredTile || 
+                            this.hoveredTile.worldTileX !== worldTileX || 
+                            this.hoveredTile.worldTileY !== worldTileY) {
+                            this.hoveredTile = newHovered;
+                        }
+                        
+                        // Show tooltip only if enabled
+                        if (this.showTooltip) {
+                            this.showTileTooltip(e.clientX, e.clientY, mapBlockX, mapBlockY, 
+                                            tileXInBlock, tileYInBlock, tileIndexInBlock);
+                        }
+                        
+                        // Check if hovering over clickable objects
+                        const romX = Math.floor(worldTileX / 2);
+                        const romY = Math.floor(worldTileY / 2);
+                        
+                        const isOverWarp = currentMap.objects?.warps?.data?.some(warp => 
+                            warp.x === romX && warp.y === romY
+                        );
+                        
+                        this.canvas.style.cursor = isOverWarp ? 'pointer' : 'grab';
+                    } else {
+                        if (this.hoveredTile) {
+                            this.hoveredTile = null;
+                        }
+                        this.hideTooltip();
+                        this.canvas.style.cursor = 'default';
+                    }
+                    
+                    return;
+                }
+            }
+        }
+        
+        // Convert to TILE coordinates (normal mode)
         const worldTileX = Math.floor((canvasX - offset.x) / (TILE_SIZE * scale));
         const worldTileY = Math.floor((canvasY - offset.y) / (TILE_SIZE * scale));
         
@@ -940,9 +1648,36 @@ export class MapViewer {
         const offset = this.viewportState.getOffset();
         const scale = this.viewportState.getScale();
         
-        // Convert to TILE coordinates
-        const tileX = Math.floor((canvasX - offset.x) / (TILE_SIZE * scale));
-        const tileY = Math.floor((canvasY - offset.y) / (TILE_SIZE * scale));
+        let tileX, tileY;
+        
+        // Check if in interior layout mode and adjust coordinates accordingly
+        if (this.showingInteriorLayout && this.interiorLayoutManager) {
+            const layout = this.interiorLayoutManager.getCurrentLayout();
+            if (layout) {
+                const mainRoom = layout.rooms.find(room => room.mapData.mapId === currentMap.mapId);
+                if (mainRoom) {
+                    // Adjust offset for the main room's position in the layout
+                    const mainRoomOffsetX = offset.x + (mainRoom.offsetX * BLOCK_SIZE * TILE_SIZE * scale);
+                    const mainRoomOffsetY = offset.y + (mainRoom.offsetY * BLOCK_SIZE * TILE_SIZE * scale);
+                    
+                    // Convert to TILE coordinates relative to the main room
+                    tileX = Math.floor((canvasX - mainRoomOffsetX) / (TILE_SIZE * scale));
+                    tileY = Math.floor((canvasY - mainRoomOffsetY) / (TILE_SIZE * scale));
+                } else {
+                    // Fallback to normal calculation
+                    tileX = Math.floor((canvasX - offset.x) / (TILE_SIZE * scale));
+                    tileY = Math.floor((canvasY - offset.y) / (TILE_SIZE * scale));
+                }
+            } else {
+                // Fallback to normal calculation
+                tileX = Math.floor((canvasX - offset.x) / (TILE_SIZE * scale));
+                tileY = Math.floor((canvasY - offset.y) / (TILE_SIZE * scale));
+            }
+        } else {
+            // Normal mode: Convert to TILE coordinates
+            tileX = Math.floor((canvasX - offset.x) / (TILE_SIZE * scale));
+            tileY = Math.floor((canvasY - offset.y) / (TILE_SIZE * scale));
+        }
         
         // ROM object coords are in 2-TILE units
         const romX = Math.floor(tileX / 2);
@@ -950,35 +1685,37 @@ export class MapViewer {
         
         Logger.log(`Clicked at tile (${tileX}, ${tileY}) = ROM coords (${romX}, ${romY})`);
         
-        // Check boundary connections first
-        const mapWidthTiles = currentMap.width * BLOCK_SIZE;
-        const mapHeightTiles = currentMap.height * BLOCK_SIZE;
-        
-        if (currentMap.connections && currentMap.connectionHeaders) {
-            const boundaryThreshold = 1;
+        // Check boundary connections first (only in normal mode, not interior layout)
+        if (!this.showingInteriorLayout) {
+            const mapWidthTiles = currentMap.width * BLOCK_SIZE;
+            const mapHeightTiles = currentMap.height * BLOCK_SIZE;
             
-            if (currentMap.connections.north && tileY >= 0 && tileY < boundaryThreshold) {
-                Logger.log('Clicked on NORTH boundary');
-                this.loadMap(currentMap.connectionHeaders.north.connectedMap);
-                return;
-            }
-            
-            if (currentMap.connections.south && tileY >= mapHeightTiles - boundaryThreshold) {
-                Logger.log('Clicked on SOUTH boundary');
-                this.loadMap(currentMap.connectionHeaders.south.connectedMap);
-                return;
-            }
-            
-            if (currentMap.connections.west && tileX >= 0 && tileX < boundaryThreshold) {
-                Logger.log('Clicked on WEST boundary');
-                this.loadMap(currentMap.connectionHeaders.west.connectedMap);
-                return;
-            }
-            
-            if (currentMap.connections.east && tileX >= mapWidthTiles - boundaryThreshold) {
-                Logger.log('Clicked on EAST boundary');
-                this.loadMap(currentMap.connectionHeaders.east.connectedMap);
-                return;
+            if (currentMap.connections && currentMap.connectionHeaders) {
+                const boundaryThreshold = 1;
+                
+                if (currentMap.connections.north && tileY >= 0 && tileY < boundaryThreshold) {
+                    Logger.log('Clicked on NORTH boundary');
+                    this.loadMap(currentMap.connectionHeaders.north.connectedMap);
+                    return;
+                }
+                
+                if (currentMap.connections.south && tileY >= mapHeightTiles - boundaryThreshold) {
+                    Logger.log('Clicked on SOUTH boundary');
+                    this.loadMap(currentMap.connectionHeaders.south.connectedMap);
+                    return;
+                }
+                
+                if (currentMap.connections.west && tileX >= 0 && tileX < boundaryThreshold) {
+                    Logger.log('Clicked on WEST boundary');
+                    this.loadMap(currentMap.connectionHeaders.west.connectedMap);
+                    return;
+                }
+                
+                if (currentMap.connections.east && tileX >= mapWidthTiles - boundaryThreshold) {
+                    Logger.log('Clicked on EAST boundary');
+                    this.loadMap(currentMap.connectionHeaders.east.connectedMap);
+                    return;
+                }
             }
         }
         
@@ -1402,6 +2139,10 @@ ${sign.scriptText.hexString}
             const isGrass = this.tilesetManager.isGrassTile(currentMap.tileset, tileId);
             const isWater = this.tilesetManager.isWaterTile(tileId);
             const isLedge = this.tilesetManager.isLedgeTile(tileId);
+            const isFlower = this.tilesetManager.isFlowerTile(currentMap.tileset, tileId);
+            const isDoor = this.tilesetManager.isDoorTile(tileId);
+            const isWarpCarpet = this.tilesetManager.isWarpCarpetTile(tileId);
+            const isCounter = this.tilesetManager.isCounterTile(tileId);
             
             // Build collision info object for display
             collisionInfo = {
@@ -1411,25 +2152,51 @@ ${sign.scriptText.hexString}
                 type: 'PASSABLE'
             };
             
+            // Determine tile type (priority order matches rendering)
             if (isGrass) {
                 collisionInfo.type = 'GRASS';
                 collisionColor = '#00ff00';
                 collisionIcon = '🌿';
+                collisionInfo.description = 'Wild Pokemon encounters';
             } else if (isWater) {
                 collisionInfo.type = 'WATER';
                 collisionColor = '#0066ff';
                 collisionIcon = '🌊';
+                collisionInfo.description = 'Requires Surf to traverse';
             } else if (isLedge) {
                 collisionInfo.type = 'LEDGE';
                 collisionColor = '#ff8800';
                 collisionIcon = '⬇️';
+                collisionInfo.description = 'One-way jumpable ledge';
+            } else if (isWarpCarpet) {
+                collisionInfo.type = 'WARP_CARPET';
+                collisionColor = '#ff00ff';
+                collisionIcon = '🟪';
+                collisionInfo.description = 'Warp zone (Pokemon Center/Mart)';
+            } else if (isDoor) {
+                collisionInfo.type = 'DOOR';
+                collisionColor = '#8000ff';
+                collisionIcon = '🚪';
+                collisionInfo.description = 'Building entrance/exit';
+            } else if (isCounter) {
+                collisionInfo.type = 'COUNTER';
+                collisionColor = '#ffff00';
+                collisionIcon = '🟨';
+                collisionInfo.description = 'Blocks movement, allows interaction';
+            } else if (isFlower) {
+                collisionInfo.type = 'FLOWER';
+                collisionColor = '#00ffff';
+                collisionIcon = '🌸';
+                collisionInfo.description = 'Decorative walkable tile';
             } else if (!isPassable) {
                 collisionInfo.type = 'WALL';
                 collisionColor = '#ff0000';
                 collisionIcon = '🧱';
+                collisionInfo.description = 'Impassable obstacle';
             } else {
                 collisionColor = '#00ff88';
                 collisionIcon = '✅';
+                collisionInfo.description = 'Normal walkable ground';
             }
         }
         
@@ -1473,8 +2240,10 @@ ${sign.scriptText.hexString}
                 hasObjects = true;
                 objectsInfo += `🚪 <span style="color: #ffff00; font-weight: bold;">Warp</span><br>`;
                 objectsInfo += `   Destination: <span style="color: #00ffff;">Map ${warp.mapId}</span><br>`;
-                if (warp.destWarpId !== undefined) {
-                    objectsInfo += `   Warp ID: <span style="color: #ffaa00;">${warp.destWarpId}</span><br>`;
+                // Support both old (warpId) and new (destWarpId) field names
+                const destWarpId = warp.destWarpId !== undefined ? warp.destWarpId : warp.warpId;
+                if (destWarpId !== undefined) {
+                    objectsInfo += `   Dest Warp ID: <span style="color: #ffaa00;">${destWarpId}</span><br>`;
                 }
                 objectsInfo += `   <span style="color: #888;">Position: (${warp.x}, ${warp.y})</span><br>`;
             }
@@ -1527,6 +2296,215 @@ ${sign.scriptText.hexString}
         tooltip.style.top = top + 'px';
     }
     
+    /**
+     * Check if mouse is hovering over a connection line in interior layout mode
+     * @param {number} canvasX - Mouse X position on canvas
+     * @param {number} canvasY - Mouse Y position on canvas
+     * @param {Object} layout - Interior layout data
+     * @param {Object} offset - Camera offset
+     * @param {number} scale - Render scale
+     * @returns {Object|null} Connection data if hovering, null otherwise
+     */
+    getHoveredConnection(canvasX, canvasY, layout, offset, scale) {
+        const roomMap = new Map(layout.rooms.map(r => [r.mapId, r]));
+        const HOVER_THRESHOLD = 10; // pixels
+        
+        for (const room of layout.rooms) {
+            const baseX = (room.offsetX * BLOCK_SIZE * TILE_SIZE * scale) + offset.x;
+            const baseY = (room.offsetY * BLOCK_SIZE * TILE_SIZE * scale) + offset.y;
+            
+            for (const connection of room.connections) {
+                const destRoom = roomMap.get(connection.toMapId);
+                if (!destRoom) continue;
+                
+                const warp = connection.fromWarp;
+                const warpSizePixels = 2 * TILE_SIZE * scale;
+                
+                // Source warp position (center)
+                const fromX = baseX + (warp.x * 2 * TILE_SIZE * scale) + (warpSizePixels / 2);
+                const fromY = baseY + (warp.y * 2 * TILE_SIZE * scale) + (warpSizePixels / 2);
+                
+                // Destination position
+                const destBaseX = (destRoom.offsetX * BLOCK_SIZE * TILE_SIZE * scale) + offset.x;
+                const destBaseY = (destRoom.offsetY * BLOCK_SIZE * TILE_SIZE * scale) + offset.y;
+                
+                let toX, toY;
+                let destWarp = null;
+                
+                if (connection.toWarpId !== undefined && destRoom.warps) {
+                    destWarp = destRoom.warps.find(w => w.warpId === connection.toWarpId);
+                    if (destWarp) {
+                        toX = destBaseX + (destWarp.x * 2 * TILE_SIZE * scale) + (warpSizePixels / 2);
+                        toY = destBaseY + (destWarp.y * 2 * TILE_SIZE * scale) + (warpSizePixels / 2);
+                    } else {
+                        toX = destBaseX + (destRoom.mapData.width * BLOCK_SIZE * TILE_SIZE * scale / 2);
+                        toY = destBaseY + (destRoom.mapData.height * BLOCK_SIZE * TILE_SIZE * scale / 2);
+                    }
+                } else {
+                    toX = destBaseX + (destRoom.mapData.width * BLOCK_SIZE * TILE_SIZE * scale / 2);
+                    toY = destBaseY + (destRoom.mapData.height * BLOCK_SIZE * TILE_SIZE * scale / 2);
+                }
+                
+                // Check if mouse is near the line
+                const distance = this.pointToLineDistance(canvasX, canvasY, fromX, fromY, toX, toY);
+                
+                if (distance < HOVER_THRESHOLD) {
+                    return {
+                        fromMapId: room.mapId,
+                        toMapId: connection.toMapId,
+                        fromWarp: warp,
+                        toWarp: destWarp,
+                        fromMapData: room.mapData,
+                        toMapData: destRoom.mapData
+                    };
+                }
+            }
+        }
+        
+        return null;
+    }
+    
+    /**
+     * Calculate distance from point to line segment
+     * @param {number} px - Point X
+     * @param {number} py - Point Y
+     * @param {number} x1 - Line start X
+     * @param {number} y1 - Line start Y
+     * @param {number} x2 - Line end X
+     * @param {number} y2 - Line end Y
+     * @returns {number} Distance in pixels
+     */
+    pointToLineDistance(px, py, x1, y1, x2, y2) {
+        const A = px - x1;
+        const B = py - y1;
+        const C = x2 - x1;
+        const D = y2 - y1;
+        
+        const dot = A * C + B * D;
+        const lenSq = C * C + D * D;
+        let param = -1;
+        
+        if (lenSq !== 0) {
+            param = dot / lenSq;
+        }
+        
+        let xx, yy;
+        
+        if (param < 0) {
+            xx = x1;
+            yy = y1;
+        } else if (param > 1) {
+            xx = x2;
+            yy = y2;
+        } else {
+            xx = x1 + param * C;
+            yy = y1 + param * D;
+        }
+        
+        const dx = px - xx;
+        const dy = py - yy;
+        return Math.sqrt(dx * dx + dy * dy);
+    }
+    
+    /**
+     * Find which room is at the given canvas position
+     * @param {number} canvasX - Canvas X coordinate
+     * @param {number} canvasY - Canvas Y coordinate
+     * @param {Object} layout - Interior layout data
+     * @param {Object} offset - Camera offset
+     * @param {number} scale - Render scale
+     * @returns {Object|null} Room object if found, null otherwise
+     */
+    findRoomAtPosition(canvasX, canvasY, layout, offset, scale) {
+        // Check rooms in reverse order (top to bottom in rendering)
+        for (let i = layout.rooms.length - 1; i >= 0; i--) {
+            const room = layout.rooms[i];
+            
+            const roomX = (room.offsetX * BLOCK_SIZE * TILE_SIZE * scale) + offset.x;
+            const roomY = (room.offsetY * BLOCK_SIZE * TILE_SIZE * scale) + offset.y;
+            const roomWidth = room.mapData.width * BLOCK_SIZE * TILE_SIZE * scale;
+            const roomHeight = room.mapData.height * BLOCK_SIZE * TILE_SIZE * scale;
+            
+            // Check if click is within room bounds
+            if (canvasX >= roomX && canvasX <= roomX + roomWidth &&
+                canvasY >= roomY && canvasY <= roomY + roomHeight) {
+                return room;
+            }
+        }
+        
+        return null;
+    }
+    
+    /**
+     * Show tooltip for connection hover
+     * @param {number} mouseX - Mouse X position
+     * @param {number} mouseY - Mouse Y position
+     * @param {Object} connection - Connection data
+     */
+    showConnectionTooltip(mouseX, mouseY, connection) {
+        const tooltip = document.getElementById('tileTooltip');
+        if (!tooltip) return;
+        
+        let content = `<div style="font-weight: bold; margin-bottom: 4px; color: #ffff00;">🔗 Warp Connection</div>`;
+        
+        // From map info
+        content += `<div style="color: #00ff00;">From Map ${connection.fromMapId}</div>`;
+        if (connection.fromMapData?.name) {
+            content += `<div style="color: #88ff88; font-size: 0.9em; margin-bottom: 2px;">"${connection.fromMapData.name}"</div>`;
+        }
+        content += `Warp Position: (${connection.fromWarp.x}, ${connection.fromWarp.y})<br>`;
+        content += `Warp ID: ${connection.fromWarp.warpId}<br>`;
+        
+        // Convert ROM coords (2-tile units) to tile coords for display
+        const fromTileX = connection.fromWarp.x * 2;
+        const fromTileY = connection.fromWarp.y * 2;
+        content += `<span style="color: #aaa; font-size: 0.9em;">Tile: (${fromTileX}, ${fromTileY})</span><br>`;
+        
+        content += `<div style="border-top: 1px solid #666; margin: 4px 0;"></div>`;
+        
+        // To map info
+        content += `<div style="color: #00ffff;">To Map ${connection.toMapId}</div>`;
+        if (connection.toMapData?.name) {
+            content += `<div style="color: #88ffff; font-size: 0.9em; margin-bottom: 2px;">"${connection.toMapData.name}"</div>`;
+        }
+        if (connection.toWarp) {
+            content += `Warp Position: (${connection.toWarp.x}, ${connection.toWarp.y})<br>`;
+            content += `Warp ID: ${connection.toWarp.warpId}<br>`;
+            
+            // Convert ROM coords to tile coords for display
+            const toTileX = connection.toWarp.x * 2;
+            const toTileY = connection.toWarp.y * 2;
+            content += `<span style="color: #aaa; font-size: 0.9em;">Tile: (${toTileX}, ${toTileY})</span><br>`;
+        } else {
+            content += `<span style="color: #ff8800;">⚠️ Destination warp not found</span><br>`;
+            if (connection.fromWarp.destWarpId !== undefined) {
+                content += `<span style="color: #888; font-size: 0.9em;">Looking for warp ID: ${connection.fromWarp.destWarpId}</span><br>`;
+            }
+        }
+        
+        content += `<div style="margin-top: 4px; color: #aaa; font-size: 0.85em;">Click to navigate to destination</div>`;
+        
+        tooltip.innerHTML = content;
+        tooltip.style.display = 'block';
+        
+        // Position tooltip
+        const tooltipWidth = tooltip.offsetWidth;
+        const tooltipHeight = tooltip.offsetHeight;
+        let left = mouseX + 10;
+        let top = mouseY + 10;
+        
+        // Keep tooltip within window bounds
+        if (left + tooltipWidth > window.innerWidth) {
+            left = mouseX - tooltipWidth - 10;
+        }
+        if (top + tooltipHeight > window.innerHeight) {
+            top = mouseY - tooltipHeight - 10;
+        }
+        
+        tooltip.style.left = left + 'px';
+        tooltip.style.top = top + 'px';
+    }
+    
     hideTooltip() {
         const tooltip = document.getElementById('tileTooltip');
         if (tooltip) {
@@ -1541,18 +2519,51 @@ ${sign.scriptText.hexString}
             toggleBtn.addEventListener('click', () => this.toggleSidebar());
         }
         
-        // Zoom controls
-        const zoomInBtn = document.getElementById('zoomInBtn');
-        const zoomOutBtn = document.getElementById('zoomOutBtn');
+        // Zoom controls - slider (inverted: right = zoom out)
+        const zoomSlider = document.getElementById('zoomSlider');
         const resetZoomBtn = document.getElementById('resetZoomBtn');
         
-        if (zoomInBtn) zoomInBtn.addEventListener('click', () => this.zoomIn());
-        if (zoomOutBtn) zoomOutBtn.addEventListener('click', () => this.zoomOut());
+        if (zoomSlider) {
+            // Initial slider value will be set by updateZoomDisplay()
+            
+            // Handle slider input
+            zoomSlider.addEventListener('input', (e) => {
+                const invertedValue = parseFloat(e.target.value);
+                const zoomValue = this.invertZoomValue(invertedValue);
+                this.setZoom(zoomValue);
+            });
+        }
+        
         if (resetZoomBtn) resetZoomBtn.addEventListener('click', () => this.resetView());
         
         // Debug controls
         const printCollisionBtn = document.getElementById('printCollisionBtn');
         if (printCollisionBtn) printCollisionBtn.addEventListener('click', () => this.printCollisionData());
+        
+        const analyzeConnectionsBtn = document.getElementById('analyzeConnectionsBtn');
+        if (analyzeConnectionsBtn) analyzeConnectionsBtn.addEventListener('click', () => this.analyzeConnections());
+        
+        const applyOptimalAlignmentsBtn = document.getElementById('applyOptimalAlignmentsBtn');
+        if (applyOptimalAlignmentsBtn) applyOptimalAlignmentsBtn.addEventListener('click', () => this.applyOptimalAlignments());
+        
+        // Tile animation debug button
+        const tileAnimDebugBtn = document.getElementById('tileAnimDebugBtn');
+        if (tileAnimDebugBtn) {
+            tileAnimDebugBtn.addEventListener('click', () => this.toggleTileAnimationDebug());
+        }
+        
+        // Interior layout checkbox
+        const interiorLayoutCheckbox = document.getElementById('showInteriorLayoutCheckbox');
+        if (interiorLayoutCheckbox) {
+            // Load saved state - default to true (checked)
+            const savedState = this.preferences.loadInteriorLayoutMode();
+            this.showingInteriorLayout = savedState;
+            interiorLayoutCheckbox.checked = savedState;
+            
+            interiorLayoutCheckbox.addEventListener('change', (e) => {
+                this.toggleInteriorLayout(e.target.checked);
+            });
+        }
         
         // Overlay toggles
         const overlaysCheckbox = document.getElementById('showOverlaysCheckbox');
@@ -1566,6 +2577,12 @@ ${sign.scriptText.hexString}
             overlaysCheckbox.addEventListener('change', (e) => {
                 this.showOverlays = e.target.checked;
                 this.preferences.saveShowOverlays(this.showOverlays);
+                
+                // Sync with interior renderer
+                if (this.interiorRenderer) {
+                    this.interiorRenderer.setShowCollisionOverlays(this.showOverlays);
+                }
+                
                 this.render();
             });
         }
@@ -1614,6 +2631,26 @@ ${sign.scriptText.hexString}
                 }
             });
         }
+        
+        // Tile optimization checkbox
+        const tileOptimizationCheckbox = document.getElementById('tileOptimizationCheckbox');
+        if (tileOptimizationCheckbox) {
+            tileOptimizationCheckbox.checked = this.tileOptimizationEnabled;
+            tileOptimizationCheckbox.addEventListener('change', (e) => {
+                this.tileOptimizationEnabled = e.target.checked;
+                this.preferences.saveTileOptimization(this.tileOptimizationEnabled);
+                Logger.log(`Tile optimization ${this.tileOptimizationEnabled ? 'enabled' : 'disabled'}`);
+                
+                // Sync with interior renderer
+                if (this.interiorRenderer) {
+                    this.interiorRenderer.setTileOptimization(this.tileOptimizationEnabled);
+                }
+                
+                // Force immediate render to show changes
+                this.isRendering = false;
+                this.render();
+            });
+        }
     }
     
     // Control methods
@@ -1637,13 +2674,68 @@ ${sign.scriptText.hexString}
         this.viewportState.resetView();
         this.preferences.saveZoom(this.viewportState.getScale());
         this.updateZoomDisplay();
+        this.updateZoomSlider();
         this.render();
+    }
+    
+    /**
+     * Set zoom to a specific value
+     * @param {number} zoom - Target zoom level
+     */
+    setZoom(zoom) {
+        this.viewportState.setScale(zoom);
+        this.preferences.saveZoom(zoom);
+        this.updateZoomDisplay();
+        this.render();
+    }
+    
+    /**
+     * Invert zoom value for slider (right = zoom out)
+     * @param {number} value - Value to invert
+     * @returns {number} Inverted value
+     */
+    invertZoomValue(value) {
+        // Invert around the midpoint in log scale for better feel
+        const min = MIN_ZOOM;
+        const max = MAX_ZOOM;
+        // Use logarithmic inversion for better distribution
+        const logMin = Math.log(min);
+        const logMax = Math.log(max);
+        const logValue = Math.log(value);
+        const inverted = Math.exp(logMax + logMin - logValue);
+        return Math.max(min, Math.min(max, inverted));
+    }
+    
+    /**
+     * Update zoom slider position
+     */
+    updateZoomSlider() {
+        const zoomSlider = document.getElementById('zoomSlider');
+        if (zoomSlider) {
+            const currentScale = this.viewportState.getScale();
+            zoomSlider.value = this.invertZoomValue(currentScale);
+        }
     }
     
     toggleOverlays() {
         this.showOverlays = !this.showOverlays;
         this.preferences.saveShowOverlays(this.showOverlays);
+        
+        // Sync collision overlay setting with interior renderer
+        if (this.interiorRenderer) {
+            this.interiorRenderer.setShowCollisionOverlays(this.showOverlays);
+        }
+        
+        // Sync checkbox state
+        const overlaysCheckbox = document.getElementById('showOverlaysCheckbox');
+        if (overlaysCheckbox) {
+            overlaysCheckbox.checked = this.showOverlays;
+        }
+        
         Logger.log(`Overlays: ${this.showOverlays ? 'ON' : 'OFF'}`);
+        
+        // Force immediate render
+        this.isRendering = false; // Reset render lock
         this.render();
     }
     
@@ -1659,6 +2751,187 @@ ${sign.scriptText.hexString}
         this.preferences.saveShowCoordLabels(this.showCoordLabels);
         Logger.log(`Coordinates: ${this.showCoordLabels ? 'ON' : 'OFF'}`);
         this.render();
+    }
+    
+    toggleTileAnimationDebug() {
+        if (this.tileAnimationDebugPanel) {
+            this.tileAnimationDebugPanel.toggle();
+            
+            // Update previews when panel opens
+            if (this.tileAnimationDebugPanel.isVisible) {
+                // Update flower frame previews
+                const flowerFrames = this.tileAnimator.getFlowerFrames();
+                this.tileAnimationDebugPanel.updateFlowerFramePreviews(flowerFrames);
+                
+                // Update water frame preview
+                this.updateWaterFramePreview();
+                
+                // Set up interval to update water preview during animation
+                if (!this._waterPreviewInterval) {
+                    this._waterPreviewInterval = setInterval(() => {
+                        if (this.tileAnimationDebugPanel && this.tileAnimationDebugPanel.isVisible) {
+                            this.updateWaterFramePreview();
+                        }
+                    }, 200); // Update 5 times per second
+                }
+            } else {
+                // Clear interval when panel closes
+                if (this._waterPreviewInterval) {
+                    clearInterval(this._waterPreviewInterval);
+                    this._waterPreviewInterval = null;
+                }
+            }
+        }
+    }
+    
+    /**
+     * Update the water frame preview in the debug panel
+     */
+    updateWaterFramePreview() {
+        const currentMap = this.mapState.getCurrentMap();
+        if (!currentMap) return;
+        
+        const tilesetImg = this.tilesetManager.getTilesetImage(currentMap.tileset);
+        if (!tilesetImg) return;
+        
+        const waterFrameCanvas = this.tileAnimator.getCurrentWaterFrame(tilesetImg, 1);
+        if (waterFrameCanvas && this.tileAnimationDebugPanel) {
+            this.tileAnimationDebugPanel.updateWaterFramePreview(waterFrameCanvas);
+        }
+    }
+    
+    /**
+     * Toggle interior layout rendering mode
+     * @param {boolean} enabled - Whether to enable interior layout mode
+     */
+    async toggleInteriorLayout(enabled) {
+        const currentMap = this.mapState.getCurrentMap();
+        if (!currentMap) {
+            Logger.warn('No map loaded');
+            // Reset checkbox if no map
+            const checkbox = document.getElementById('showInteriorLayoutCheckbox');
+            if (checkbox) checkbox.checked = false;
+            return;
+        }
+        
+        if (!enabled || this.showingInteriorLayout) {
+            // Switch back to normal rendering
+            this.showingInteriorLayout = false;
+            this.interiorLayoutManager.clearCurrentLayout();
+            this.preferences.saveShowInteriorLayout(false);
+            
+            Logger.log('Interior layout mode: OFF');
+            this.render();
+        } else {
+            // Check if this is an interior map
+            if (!this.interiorLayoutManager.isInteriorMap(currentMap)) {
+                Logger.warn(`Map ${currentMap.mapId} is not an interior map (has connections)`);
+                
+                // Reset checkbox
+                const checkbox = document.getElementById('showInteriorLayoutCheckbox');
+                if (checkbox) checkbox.checked = false;
+                
+                return;
+            }
+            
+            // Analyze and build layout
+            Logger.log(`🏢 Analyzing interior layout for map ${currentMap.mapId}...`);
+            const layout = await this.interiorLayoutManager.analyzeInteriorMapLayout(currentMap.mapId);
+            
+            if (!layout) {
+                Logger.error('Failed to build interior layout');
+                
+                // Reset checkbox
+                const checkbox = document.getElementById('showInteriorLayoutCheckbox');
+                if (checkbox) checkbox.checked = false;
+                
+                return;
+            }
+            
+            // Set layout and switch to interior rendering mode
+            this.interiorLayoutManager.setCurrentLayout(layout);
+            this.showingInteriorLayout = true;
+            this.preferences.saveShowInteriorLayout(true);
+            
+            Logger.success(`✓ Interior layout loaded: ${layout.rooms.length} rooms`);
+            
+            // Center view on the layout
+            this.centerViewOnInteriorLayout(layout);
+            
+            this.render();
+        }
+    }
+    
+    /**
+     * Center the view on an interior layout, focusing on the main room
+     * Uses same top-left positioning as normal mode
+     */
+    centerViewOnInteriorLayout(layout) {
+        if (!layout) return;
+        
+        const currentMap = this.mapState.getCurrentMap();
+        if (!currentMap) return;
+        
+        // Find the main room in the layout
+        const mainRoom = layout.rooms.find(room => room.mapData.mapId === currentMap.mapId);
+        if (!mainRoom) {
+            Logger.warn(`Main room ${currentMap.mapId} not found in layout, centering on entire layout`);
+            this.centerViewOnEntireLayout(layout);
+            return;
+        }
+        
+        const scale = this.viewportState.getScale();
+        
+        // Position main room at top-left like normal mode (DEFAULT_OFFSET_X/Y)
+        // Calculate offset so main room's top-left corner is at DEFAULT_OFFSET position
+        const roomTopLeftX = mainRoom.offsetX * BLOCK_SIZE * TILE_SIZE * scale;
+        const roomTopLeftY = mainRoom.offsetY * BLOCK_SIZE * TILE_SIZE * scale;
+        
+        const offsetX = DEFAULT_OFFSET_X - roomTopLeftX;
+        const offsetY = DEFAULT_OFFSET_Y - roomTopLeftY;
+        
+        this.viewportState.offsetX = offsetX;
+        this.viewportState.offsetY = offsetY;
+        
+        Logger.log(`📍 Interior layout centered on main room ${currentMap.mapId} at top-left position (${offsetX.toFixed(0)}, ${offsetY.toFixed(0)})`);
+    }
+    
+    /**
+     * Center the view on the entire interior layout (fallback)
+     */
+    centerViewOnEntireLayout(layout) {
+        if (!layout) return;
+        
+        const scale = this.viewportState.getScale();
+        const totalWidthPx = layout.totalWidth * BLOCK_SIZE * TILE_SIZE * scale;
+        const totalHeightPx = layout.totalHeight * BLOCK_SIZE * TILE_SIZE * scale;
+        
+        const canvasWidth = this.renderer.getWidth();
+        const canvasHeight = this.renderer.getHeight();
+        
+        // Center if layout fits, otherwise add padding
+        let centerX, centerY;
+        
+        if (totalWidthPx < canvasWidth) {
+            // Layout fits horizontally - center it
+            centerX = (canvasWidth - totalWidthPx) / 2;
+        } else {
+            // Layout is wider than canvas - add left padding
+            centerX = 50;
+        }
+        
+        if (totalHeightPx < canvasHeight) {
+            // Layout fits vertically - center it
+            centerY = (canvasHeight - totalHeightPx) / 2;
+        } else {
+            // Layout is taller than canvas - add top padding
+            centerY = 50;
+        }
+        
+        this.viewportState.offsetX = centerX;
+        this.viewportState.offsetY = centerY;
+        
+        Logger.log(`📍 Interior layout centered at (${centerX}, ${centerY})`);
     }
     
     printCollisionData() {
@@ -1753,6 +3026,179 @@ ${sign.scriptText.hexString}
         console.log('═══════════════════════════════════════════════════════\n');
     }
     
+    async analyzeConnections() {
+        console.clear();
+        console.log('═══════════════════════════════════════════════════════');
+        console.log('🔗 CONNECTION ALIGNMENT ANALYSIS');
+        console.log('═══════════════════════════════════════════════════════');
+        
+        const currentMap = this.mapState.getCurrentMap();
+        if (!currentMap) {
+            console.log('\n⚠️  No map currently loaded');
+            Logger.warn('Load a map first before analyzing connections');
+            return;
+        }
+        console.log(`\n📍 Current Map: ${currentMap.name} (ID: ${currentMap.id})`);
+        console.log(`   Size: ${currentMap.width}x${currentMap.height} blocks`);
+        console.log(`   Tileset: ${currentMap.tilesetName} (ID: ${currentMap.tileset})`);
+        
+        // Check if map has connections
+        if (!currentMap.connections || Object.keys(currentMap.connections).length === 0) {
+            console.log('\n❌ This map has no connections');
+            return;
+        }
+        
+        console.log(`\n🔗 Found ${Object.keys(currentMap.connections).length} connection(s)`);
+        
+        // Track analysis results
+        const analysisResults = [];
+        
+        // Analyze each connection
+        const directions = ['north', 'south', 'east', 'west'];
+        for (const direction of directions) {
+            if (!currentMap.connections[direction] || !currentMap.connectionHeaders[direction]) {
+                continue;
+            }
+            
+            const header = currentMap.connectionHeaders[direction];
+            const connectedMapId = header.connectedMap;
+            
+            console.log(`\n${'─'.repeat(55)}`);
+            console.log(`📌 ${direction.toUpperCase()} Connection`);
+            console.log(`${'─'.repeat(55)}`);
+            
+            // Load connected map
+            const connectedMap = await this.mapDataManager.loadMapByIndex(connectedMapId);
+            if (!connectedMap) {
+                console.log('   ⚠️  Could not load connected map');
+                continue;
+            }
+            
+            // Ensure tilesets are loaded
+            if (!this.tilesetManager.hasBlockDefinitions(currentMap.tileset)) {
+                await this.tilesetManager.loadTilesetBlocks(currentMap.tileset);
+            }
+            if (!this.tilesetManager.hasBlockDefinitions(connectedMap.tileset)) {
+                await this.tilesetManager.loadTilesetBlocks(connectedMap.tileset);
+            }
+            
+            // Analyze alignment
+            const currentAlignment = direction === 'north' || direction === 'south' ? header.xAlignment : header.yAlignment;
+            const result = await this.connectionAligner.analyzeConnectionAlignment(
+                currentMap,
+                connectedMap,
+                direction,
+                currentAlignment
+            );
+            
+            analysisResults.push({
+                direction,
+                header,
+                ...result
+            });
+        }
+        
+        console.log(`\n${'═'.repeat(55)}`);
+        console.log('📊 ANALYSIS SUMMARY');
+        console.log(`${'═'.repeat(55)}`);
+        
+        const needsAdjustment = analysisResults.filter(r => r.shouldAdjust);
+        const alreadyOptimal = analysisResults.filter(r => !r.shouldAdjust && r.currentScore > 0);
+        const noWalkable = analysisResults.filter(r => r.currentScore === 0 && r.optimalScore === 0);
+        
+        console.log(`\n✅ Optimal: ${alreadyOptimal.length}`);
+        console.log(`⚠️  Needs adjustment: ${needsAdjustment.length}`);
+        console.log(`❌ No walkable alignments: ${noWalkable.length}`);
+        
+        if (needsAdjustment.length > 0) {
+            console.log(`\n💡 SUGGESTED ADJUSTMENTS:`);
+            needsAdjustment.forEach((result, index) => {
+                console.log(`\n  ${index + 1}. ${result.direction.toUpperCase()}:`);
+                console.log(`     Current: ${result.currentAlignment}px (score: ${result.currentScore})`);
+                console.log(`     Optimal: ${result.optimalAlignment}px (score: ${result.optimalScore})`);
+                console.log(`     Change: ${result.optimalAlignment - result.currentAlignment > 0 ? '+' : ''}${result.optimalAlignment - result.currentAlignment}px`);
+            });
+            
+            console.log(`\n🔧 APPLY ADJUSTMENTS:`);
+            console.log(`   Run: mapViewer.applyOptimalAlignments()`);
+            console.log(`   This will temporarily adjust connection rendering to use optimal alignments.`);
+        }
+        
+        console.log(`\n${'═'.repeat(55)}`);
+        console.log('✅ Connection analysis complete');
+        console.log(`${'═'.repeat(55)}\n`);
+        
+        Logger.success('Connection alignment analysis printed to console');
+        
+        // Return results for potential programmatic use
+        return analysisResults;
+    }
+    
+    /**
+     * Apply optimal alignments to connected maps and re-render
+     * This temporarily overrides connection headers with calculated optimal alignments
+     */
+    async applyOptimalAlignments() {
+        const currentMap = this.mapState.getCurrentMap();
+        if (!currentMap) {
+            Logger.warn('No map loaded');
+            return;
+        }
+        
+        Logger.log('Applying optimal connection alignments...');
+        
+        let adjustmentCount = 0;
+        const directions = ['north', 'south', 'east', 'west'];
+        
+        for (const direction of directions) {
+            if (!currentMap.connections[direction] || !currentMap.connectionHeaders[direction]) {
+                continue;
+            }
+            
+            const header = currentMap.connectionHeaders[direction];
+            const connectedMapId = header.connectedMap;
+            const connectedMap = await this.mapDataManager.loadMapByIndex(connectedMapId);
+            
+            if (!connectedMap) continue;
+            
+            // Ensure tilesets loaded
+            if (!this.tilesetManager.hasBlockDefinitions(currentMap.tileset)) {
+                await this.tilesetManager.loadTilesetBlocks(currentMap.tileset);
+            }
+            if (!this.tilesetManager.hasBlockDefinitions(connectedMap.tileset)) {
+                await this.tilesetManager.loadTilesetBlocks(connectedMap.tileset);
+            }
+            
+            // Analyze and get optimal alignment
+            const currentAlignment = direction === 'north' || direction === 'south' ? header.xAlignment : header.yAlignment;
+            const result = await this.connectionAligner.analyzeConnectionAlignment(
+                currentMap,
+                connectedMap,
+                direction,
+                currentAlignment
+            );
+            
+            if (result.shouldAdjust) {
+                // Apply optimal alignment to header
+                if (direction === 'north' || direction === 'south') {
+                    header.xAlignment = result.optimalAlignment;
+                } else {
+                    header.yAlignment = result.optimalAlignment;
+                }
+                
+                Logger.success(`Adjusted ${direction} connection: ${currentAlignment}px → ${result.optimalAlignment}px`);
+                adjustmentCount++;
+            }
+        }
+        
+        if (adjustmentCount > 0) {
+            Logger.success(`Applied ${adjustmentCount} alignment adjustment(s). Re-rendering...`);
+            await this.render();
+        } else {
+            Logger.log('All connections already optimal, no adjustments needed');
+        }
+    }
+    
     toggleSidebar() {
         const sidebar = document.getElementById('sidebar');
         const toggleBtn = document.getElementById('toggleSidebarBtn');
@@ -1782,6 +3228,9 @@ ${sign.scriptText.hexString}
         if (zoomEl) {
             zoomEl.textContent = `${this.viewportState.getScale()}x`;
         }
+        
+        // Also update slider position
+        this.updateZoomSlider();
     }
     
     getModuleVersions() {
@@ -1790,6 +3239,7 @@ ${sign.scriptText.hexString}
             'Config': CONFIG_VERSION,
             'Logger': LOGGER_VERSION,
             'ErrorHandler': ERROR_HANDLER_VERSION,
+            'FPSCounter': FPS_COUNTER_VERSION,
             'ViewportState': VIEWPORT_STATE_VERSION,
             'MapState': MAP_STATE_VERSION,
             'PreferencesManager': PREFERENCES_VERSION,
@@ -1797,7 +3247,11 @@ ${sign.scriptText.hexString}
             'MapDataManager': MAP_DATA_VERSION,
             'TilesetManager': TILESET_VERSION,
             'SpriteManager': SPRITE_VERSION,
-            'CanvasRenderer': RENDERER_VERSION
+            'CanvasRenderer': RENDERER_VERSION,
+            'NPCMovement': NPC_MOVEMENT_VERSION,
+            'TileAnimator': TILE_ANIMATOR_VERSION,
+            'InteriorLayoutManager': INTERIOR_LAYOUT_VERSION,
+            'InteriorRenderer': INTERIOR_RENDERER_VERSION
         };
     }
     
@@ -1810,13 +3264,19 @@ ${sign.scriptText.hexString}
                 .join(' | ');
             
             const mainInfo = mapCount !== null 
-                ? `Map Viewer v${MAP_VIEWER_VERSION} | Build: ${MAP_VIEWER_BUILD_DATE} | Maps: ${mapCount}`
-                : `Map Viewer v${MAP_VIEWER_VERSION} | Build: ${MAP_VIEWER_BUILD_DATE}`;
+                ? `Map Viewer v${MAP_VIEWER_VERSION} | Build: ${MAP_VIEWER_BUILD_DATE} | Maps: <span id="mapsCount">${mapCount}</span> | FPS: <span id="fpsDisplay">--</span>`
+                : `Map Viewer v${MAP_VIEWER_VERSION} | Build: ${MAP_VIEWER_BUILD_DATE} | Maps: <span id="mapsCount">0</span> | FPS: <span id="fpsDisplay">--</span>`;
             
             footer.innerHTML = `
                 <div class="main-version">${mainInfo}</div>
                 <div class="modules">Modules: ${versionList}</div>
             `;
+            
+            // Reinitialize FPS display element after innerHTML update
+            const fpsElement = document.getElementById('fpsDisplay');
+            if (fpsElement && this.fpsCounter) {
+                this.fpsCounter.setDisplayElement(fpsElement);
+            }
         }
     }
     
@@ -1910,9 +3370,6 @@ ${sign.scriptText.hexString}
         try {
             const mapData = await this.mapDataManager.loadMap(mapId);
             
-            console.log(`[MapViewer] Loading map ${mapId}: ${mapData.name}, tileset: ${mapData.tileset}, size: ${mapData.width}x${mapData.height} blocks`);
-            console.log(`[MapViewer] First 10 blockIds:`, mapData.blockData.slice(0, 10));
-            
             // Load tileset if needed
             if (!this.tilesetManager.hasTileset(mapData.tileset)) {
                 Logger.log(`Loading tileset ${mapData.tileset}...`);
@@ -1923,20 +3380,6 @@ ${sign.scriptText.hexString}
             if (!this.tilesetManager.hasBlockDefinitions(mapData.tileset)) {
                 Logger.log(`Loading block definitions for tileset ${mapData.tileset}...`);
                 await this.tilesetManager.loadTilesetBlocks(mapData.tileset);
-                
-                // Debug: Show first block definition and its collision
-                const firstBlockDef = this.tilesetManager.getBlockDefinition(mapData.tileset, 0);
-                console.log(`[MapViewer] First block (ID=0) definition:`, firstBlockDef);
-                if (firstBlockDef && firstBlockDef.tiles) {
-                    // Show collision info for first row of tiles (4 tiles)
-                    console.log(`[MapViewer] First block tile collision info:`, 
-                        firstBlockDef.tiles[0].map(tileId => ({
-                            tileId,
-                            walkable: this.tilesetManager.isTileWalkable(mapData.tileset, tileId),
-                            collision: this.tilesetManager.getTileCollision(mapData.tileset, tileId)
-                        }))
-                    );
-                }
             }
             
             // Load sprite metadata if needed
@@ -1971,8 +3414,37 @@ ${sign.scriptText.hexString}
             // Center view without changing zoom
             this.viewportState.resetPosition();
             
-            // Render
-            this.render();
+            // Check if we should enable interior layout mode
+            // Restore preference from localStorage if this is an interior map
+            const savedInteriorLayoutPref = this.preferences.loadShowInteriorLayout();
+            const isInterior = this.interiorLayoutManager && this.interiorLayoutManager.isInteriorMap(mapData);
+            
+            // Apply interior layout if preference is enabled and this is an interior map
+            if (savedInteriorLayoutPref && isInterior) {
+                this.showingInteriorLayout = true;
+                Logger.log(`🏢 Auto-loading interior layout for map ${mapId}...`);
+                try {
+                    // Clear layout and cache to rebuild from current map as root
+                    this.interiorLayoutManager.clearCurrentLayout();
+                    this.interiorLayoutManager.clearCache();
+                    
+                    const layout = await this.interiorLayoutManager.analyzeInteriorMapLayout(mapData.mapId);
+                    if (layout) {
+                        this.interiorLayoutManager.setCurrentLayout(layout);
+                        this.centerViewOnInteriorLayout(layout);
+                        Logger.success(`✓ Interior layout auto-loaded: ${layout.rooms.length} rooms`);
+                    }
+                } catch (error) {
+                    Logger.warn(`Failed to auto-load interior layout: ${error.message}`);
+                }
+            } else if (!isInterior && this.showingInteriorLayout) {
+                // If switching to non-interior map, disable layout mode but keep preference
+                this.showingInteriorLayout = false;
+                this.interiorLayoutManager.clearCurrentLayout();
+            }
+            
+            // Render (await to ensure it completes)
+            await this.render();
             
             Logger.success(`Map ${mapId} loaded and rendered successfully`);
             
@@ -1997,6 +3469,40 @@ ${sign.scriptText.hexString}
         if (idEl) idEl.textContent = mapData.mapId;
         if (sizeEl) sizeEl.textContent = `${mapData.width}x${mapData.height}`;
         if (tilesetEl) tilesetEl.textContent = mapData.tilesetName;
+        
+        // Enable debug buttons now that a map is loaded
+        const analyzeConnectionsBtn = document.getElementById('analyzeConnectionsBtn');
+        if (analyzeConnectionsBtn) {
+            analyzeConnectionsBtn.disabled = false;
+        }
+        
+        const applyOptimalAlignmentsBtn = document.getElementById('applyOptimalAlignmentsBtn');
+        if (applyOptimalAlignmentsBtn) {
+            applyOptimalAlignmentsBtn.disabled = false;
+        }
+        
+        // Enable/disable interior layout checkbox based on map type
+        const interiorLayoutCheckbox = document.getElementById('showInteriorLayoutCheckbox');
+        if (interiorLayoutCheckbox && this.interiorLayoutManager) {
+            const isInterior = this.interiorLayoutManager.isInteriorMap(mapData);
+            interiorLayoutCheckbox.disabled = !isInterior;
+            
+            // Set checkbox state based on current mode
+            if (isInterior) {
+                interiorLayoutCheckbox.checked = this.showingInteriorLayout;
+                const label = document.querySelector('label[for="showInteriorLayoutCheckbox"]');
+                if (label) {
+                    label.title = 'Show connected interior rooms side-by-side';
+                }
+            } else {
+                // For non-interior maps, uncheck but don't modify the preference
+                interiorLayoutCheckbox.checked = false;
+                const label = document.querySelector('label[for="showInteriorLayoutCheckbox"]');
+                if (label) {
+                    label.title = 'Only available for interior maps without connections';
+                }
+            }
+        }
     }
     
     updateActiveMapItem(mapId) {

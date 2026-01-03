@@ -211,8 +211,8 @@ export function extractAllTilesets(rom) {
       // Read blocks (metatiles - 4x4 tile arrangements)
       const blocks = readTilesetBlocks(rom, header, 256);
       
-      // Read collision data (list of impassable tile IDs)
-      const impassableTiles = readTilesetCollision(rom, header);
+      // Read collision data (list of PASSABLE tile IDs - game defines walkable tiles!)
+      const passableTiles = readTilesetCollision(rom, header);
       
       // Read raw graphics (we'll process this separately for PNG export)
       const graphics = readTilesetGraphics(rom, header, 256);
@@ -220,12 +220,12 @@ export function extractAllTilesets(rom) {
       tilesets.push({
         ...header,
         blocks: blocks, // Now structured with tile IDs
-        impassableTiles: impassableTiles, // Array of impassable tile IDs
+        passableTiles: passableTiles, // Array of PASSABLE tile IDs
         graphicsSize: graphics.length,
         graphicsOffset: `Included (${graphics.length} bytes)`
       });
 
-      console.log(`[OK] Tileset ${header.tilesetId}: ${blocks.length} blocks, ${impassableTiles.length} impassable tiles, ${graphics.length} bytes graphics`);
+      console.log(`[OK] Tileset ${header.tilesetId}: ${blocks.length} blocks, ${passableTiles.length} passable tiles, ${graphics.length} bytes graphics`);
     } catch (error) {
       console.warn(`[WARNING] Failed to extract tileset ${header.tilesetId}: ${error.message}`);
     }

@@ -2,7 +2,8 @@
 import { CacheManager } from './CacheManager.js';
 import { Logger } from '../utils/Logger.js';
 
-export const MODULE_VERSION = '1.0.0';
+// Always update version after changes
+export const MODULE_VERSION = '1.0.1';
 
 export class MapDataManager {
     constructor(config) {
@@ -48,10 +49,28 @@ export class MapDataManager {
         return map.name;
     }
     
+    /**
+     * Load map by index (0-based array index, not mapId)
+     * @param {number} index - The array index in the map list
+     * @returns {Promise<Object>} - The map data
+     */
+    async loadMapByIndex(index) {
+        if (!this.mapIndex) {
+            await this.loadMapIndex();
+        }
+        
+        if (index < 0 || index >= this.mapIndex.maps.length) {
+            Logger.warn(`Map index ${index} out of range`);
+            return null;
+        }
+        
+        const mapInfo = this.mapIndex.maps[index];
+        return await this.loadMap(mapInfo.mapId);
+    }
+    
     async loadMap(mapId) {
         // Check cache first
         if (this.cache.has(mapId)) {
-            Logger.log(`Map ${mapId} loaded from cache`);
             return this.cache.get(mapId);
         }
         

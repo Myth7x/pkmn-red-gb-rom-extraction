@@ -1,6 +1,7 @@
 // Map navigation state management
 import { Logger } from '../utils/Logger.js';
 
+// Always update version after changes
 export const MODULE_VERSION = '1.0.1';
 
 export class MapState {

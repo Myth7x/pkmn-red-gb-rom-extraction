@@ -1,6 +1,7 @@
 // Generic caching with LRU (Least Recently Used) eviction
 import { Logger } from '../utils/Logger.js';
 
+// Always update version after changes
 export const MODULE_VERSION = '1.0.0';
 
 export class CacheManager {

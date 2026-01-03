@@ -54,8 +54,8 @@ export function readMapObjects(rom, mapHeader, bank) {
     warps.push({
       y: rom[offset++],
       x: rom[offset++],
-      warpId: rom[offset++],
-      mapId: rom[offset++]
+      destWarpId: rom[offset++],  // Destination warp ID on target map
+      mapId: rom[offset++]         // Destination map ID
     });
   }
 

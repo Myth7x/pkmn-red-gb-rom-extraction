@@ -2,7 +2,8 @@
 import { STORAGE_KEYS } from '../core/Constants.js';
 import { Logger } from '../utils/Logger.js';
 
-export const MODULE_VERSION = '1.0.0';
+// Version: Update patch number for bug fixes, minor for new features, major for breaking changes
+export const MODULE_VERSION = '1.0.1';
 
 export class PreferencesManager {
     save(key, value) {
@@ -41,7 +42,9 @@ export class PreferencesManager {
     }
     
     loadZoom(defaultZoom = 2) {
-        return this.loadNumber(STORAGE_KEYS.ZOOM, defaultZoom);
+        const value = this.load(STORAGE_KEYS.ZOOM);
+        const parsed = parseFloat(value);
+        return isNaN(parsed) ? defaultZoom : parsed;
     }
     
     // Current map preferences
@@ -120,6 +123,33 @@ export class PreferencesManager {
         Logger.log(`Tooltip: ${value ? 'ON' : 'OFF'} (saved)`);
     }
     
+    saveTileOptimization(value) {
+        this.save(STORAGE_KEYS.TILE_OPTIMIZATION, value);
+        Logger.log(`Tile Optimization: ${value ? 'ON' : 'OFF'} (saved)`);
+    }
+    
+    loadTileOptimization() {
+        return this.loadBoolean(STORAGE_KEYS.TILE_OPTIMIZATION, true); // Default to enabled
+    }
+    
+    saveShowInteriorLayout(value) {
+        this.save(STORAGE_KEYS.SHOW_INTERIOR_LAYOUT, value);
+        Logger.log(`Interior Layout: ${value ? 'ON' : 'OFF'} (saved)`);
+    }
+    
+    loadShowInteriorLayout() {
+        return this.loadBoolean(STORAGE_KEYS.SHOW_INTERIOR_LAYOUT, true); // Default to enabled
+    }
+    
+    // Alias for compatibility
+    loadInteriorLayoutMode() {
+        return this.loadShowInteriorLayout();
+    }
+    
+    saveInteriorLayoutMode(value) {
+        this.saveShowInteriorLayout(value);
+    }
+    
     // Sidebar preferences
     saveSidebarState(hidden) {
         this.save(STORAGE_KEYS.SIDEBAR_HIDDEN, hidden);
@@ -127,6 +157,22 @@ export class PreferencesManager {
     }
     
     loadSidebarState() {
-        return this.loadBoolean(STORAGE_KEYS.SIDEBAR_HIDDEN, false);
+        return this.loadBoolean(STORAGE_KEYS.SIDEBAR_HIDDEN, true); // Default to hidden
+    }
+    
+    // Panel collapse state preferences
+    savePanelState(panelName, collapsed) {
+        const key = `PANEL_${panelName.toUpperCase().replace(/-/g, '_')}`;
+        if (STORAGE_KEYS[key]) {
+            this.save(STORAGE_KEYS[key], collapsed);
+        }
+    }
+    
+    loadPanelState(panelName) {
+        const key = `PANEL_${panelName.toUpperCase().replace(/-/g, '_')}`;
+        if (STORAGE_KEYS[key]) {
+            return this.loadBoolean(STORAGE_KEYS[key], true); // Default to collapsed
+        }
+        return true; // Default to collapsed if key not found
     }
 }

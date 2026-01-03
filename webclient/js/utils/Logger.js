@@ -1,5 +1,6 @@
 // Logging utilities with emoji prefixes for better visibility
 
+// Always update version after changes
 export const MODULE_VERSION = '1.0.0';
 
 export class Logger {

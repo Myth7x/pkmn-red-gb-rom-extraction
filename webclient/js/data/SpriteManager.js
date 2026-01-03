@@ -2,6 +2,7 @@
 import { MIN_SPRITE_ID, MAX_SPRITE_ID } from '../core/Constants.js';
 import { Logger } from '../utils/Logger.js';
 
+// Always update version after changes
 export const MODULE_VERSION = '1.0.1';
 
 export class SpriteManager {

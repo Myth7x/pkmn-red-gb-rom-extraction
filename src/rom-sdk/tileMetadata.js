@@ -37,7 +37,7 @@ export function analyzeTileMetadata(mapData, tilesetData) {
 
   // Get collision data for the tileset
   const tileset = tilesetData.tilesets.find(t => t.tilesetId === mapData.tileset);
-  if (!tileset || !tileset.impassableTiles || !tileset.blocks) {
+  if (!tileset || !tileset.passableTiles || !tileset.blocks) {
     return analysis;
   }
 
@@ -265,7 +265,7 @@ export function isTileWalkable(x, y, mapData, tilesetData) {
 
   const blockId = mapData.blockData[index];
   const tileset = tilesetData.tilesets.find(t => t.tilesetId === mapData.tileset);
-  if (!tileset || !tileset.blocks || !tileset.impassableTiles) return false;
+  if (!tileset || !tileset.blocks || !tileset.passableTiles) return false;
 
   const block = tileset.blocks[blockId];
   if (!block) return false;
@@ -274,7 +274,7 @@ export function isTileWalkable(x, y, mapData, tilesetData) {
   for (let tileRow = 0; tileRow < 4; tileRow++) {
     for (let tileCol = 0; tileCol < 4; tileCol++) {
       const tileId = block.tiles[tileRow][tileCol];
-      if (isTilePassable(tileId, tileset.impassableTiles)) {
+      if (isTilePassable(tileId, tileset.passableTiles)) {
         return true;
       }
     }
@@ -303,7 +303,7 @@ export function isTileSurfable(x, y, mapData, tilesetData) {
 
   const blockId = mapData.blockData[index];
   const tileset = tilesetData.tilesets.find(t => t.tilesetId === mapData.tileset);
-  if (!tileset || !tileset.blocks || !tileset.impassableTiles) return false;
+  if (!tileset || !tileset.blocks || !tileset.passableTiles) return false;
 
   const block = tileset.blocks[blockId];
   if (!block) return false;

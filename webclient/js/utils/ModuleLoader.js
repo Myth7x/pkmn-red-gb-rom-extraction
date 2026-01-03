@@ -1,6 +1,7 @@
 // Module loader with automatic cache busting
 // This utility ensures all ES6 modules are loaded fresh
 
+// Always update version after changes
 export const MODULE_VERSION = '1.0.0';
 
 export class ModuleLoader {

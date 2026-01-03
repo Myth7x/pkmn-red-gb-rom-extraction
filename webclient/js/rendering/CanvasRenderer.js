@@ -18,12 +18,13 @@ export class CanvasRenderer {
         this.ctx.drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh);
     }
     
-    drawRect(x, y, w, h, color, fill = true) {
+    drawRect(x, y, w, h, color, fill = true, lineWidth = 1) {
         if (fill) {
             this.ctx.fillStyle = color;
             this.ctx.fillRect(x, y, w, h);
         } else {
             this.ctx.strokeStyle = color;
+            this.ctx.lineWidth = lineWidth;
             this.ctx.strokeRect(x, y, w, h);
         }
     }
@@ -66,6 +67,23 @@ export class CanvasRenderer {
         this.ctx.moveTo(x1, y1);
         this.ctx.lineTo(x2, y2);
         this.ctx.stroke();
+    }
+    
+    drawCircle(x, y, radius, color, fill = true) {
+        this.ctx.beginPath();
+        this.ctx.arc(x, y, radius, 0, Math.PI * 2);
+        if (fill) {
+            this.ctx.fillStyle = color;
+            this.ctx.fill();
+        } else {
+            this.ctx.strokeStyle = color;
+            this.ctx.stroke();
+        }
+    }
+    
+    setStrokeStyle(color, lineWidth = 1) {
+        this.ctx.strokeStyle = color;
+        this.ctx.lineWidth = lineWidth;
     }
     
     setAlpha(alpha) {

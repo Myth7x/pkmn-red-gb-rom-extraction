@@ -3,24 +3,7 @@
  * 
  * Based on analysis of pret/pokered disassembly.
  * 
- * KEY INSIG  // Read tile IDs until we hit 0xFF (end marker)
-  while (true) {
-    const tileId = rom[offset + i];
-    if (tileId === 0xFF) {
-      break; // End of collision list
-    }
-    passableTiles.push(tileId);
-    i++;
-    
-    // Safety check to prevent infinite loops
-    if (i > 256) {
-      console.warn(`Collision list for tileset ${tilesetHeader.name} exceeded 256 entries!`);
-      break;
-    }
-  }
-  
-  return passableTiles;
-}ILE-BASED, not block-based!
+ * KEY INSIGHT: Collision is TILE-BASED, not block-based!
  * - Each tileset has a list of IMPASSABLE TILE IDs
  * - Blocks are just 4x4 arrangements of tiles for visual organization
  * - Collision is determined by checking if a tile ID is in the impassable list
@@ -145,23 +128,20 @@ export function readTilesetBlocks(rom, tilesetHeader, numBlocks = 256) {
 /**
  * Read collision data for a tileset (CORRECT METHOD)
  * 
- * The collision data is a LIST OF TILE IDs that are PASSABLE/WALKABLE,
+ * The collision data is a LIST OF TILE IDs that are impassable,
  * terminated by 0xFF.
- * 
- * From pret/pokered: wTilesetCollisionPtr points to "list of passable tiles"
- * CheckTilePassable loops through this list - if tile found = passable, if not found = impassable
  * 
  * This is NOT 256 bytes of collision values! It's a variable-length list!
  * 
  * @param {Buffer} rom - ROM buffer
  * @param {Object} tilesetHeader - Tileset header object
- * @returns {Array<number>} - Array of PASSABLE tile IDs
+ * @returns {Array<number>} - Array of impassable tile IDs
  */
 export function readTilesetCollision(rom, tilesetHeader) {
   const collPtr = parseInt(tilesetHeader.collPtr, 16);
   const offset = bankPointerToOffset(tilesetHeader.bank, collPtr);
   
-  const passableTiles = [];
+  const impassableTiles = [];
   let i = 0;
   
   // Read tile IDs until we hit 0xFF (end marker)
@@ -170,7 +150,7 @@ export function readTilesetCollision(rom, tilesetHeader) {
     if (tileId === 0xFF) {
       break; // End of list
     }
-    passableTiles.push(tileId);
+    impassableTiles.push(tileId);
     i++;
     
     // Safety check to prevent infinite loops
@@ -180,36 +160,36 @@ export function readTilesetCollision(rom, tilesetHeader) {
     }
   }
   
-  return passableTiles;
+  return impassableTiles;
 }
 
 /**
  * Check if a tile ID is passable
  * @param {number} tileId - Tile ID to check
- * @param {Array<number>} passableTiles - List of passable tile IDs (from game data)
+ * @param {Array<number>} impassableTiles - List of impassable tile IDs
  * @returns {boolean} - True if passable, false if impassable
  */
-export function isTilePassable(tileId, passableTiles) {
-  return passableTiles.includes(tileId);
+export function isTilePassable(tileId, impassableTiles) {
+  return !impassableTiles.includes(tileId);
 }
 
 /**
  * Get tile collision properties
  * @param {number} tileId - Tile ID
- * @param {Object} tileset - Tileset data with passableTiles, grassTile, etc.
+ * @param {Object} tileset - Tileset data with impassableTiles, grassTile, etc.
  * @returns {Object} - Collision properties
  */
 export function getTileCollisionInfo(tileId, tileset) {
-  const walkable = tileset.passableTiles.includes(tileId);
+  const walkable = !tileset.impassableTiles.includes(tileId);
   
   // Determine tile type
-  let type = 'WALL';
+  let type = 'PASSABLE';
   let surfable = false;
-  let description = 'Impassable tile';
+  let description = 'Passable ground';
   
-  if (walkable) {
-    type = 'PASSABLE';
-    description = 'Passable ground';
+  if (!walkable) {
+    type = 'WALL';
+    description = 'Impassable tile';
   }
   
   // Check for grass
@@ -302,7 +282,7 @@ export function readAllTilesetHeaders(rom, numTilesets = 24) {
 }
 
 /**
- * Extract complete tileset data including blocks and collision
+ * Read complete tileset data (header + blocks + collision + graphics)
  * @param {Buffer} rom - ROM buffer
  * @param {number} tilesetId - Tileset ID
  * @returns {Object} - Complete tileset data
@@ -310,16 +290,16 @@ export function readAllTilesetHeaders(rom, numTilesets = 24) {
 export function readCompleteTileset(rom, tilesetId) {
   const header = readTilesetHeader(rom, tilesetId);
   const blocks = readTilesetBlocks(rom, header);
-  const passableTiles = readTilesetCollision(rom, header);
+  const impassableTiles = readTilesetCollision(rom, header);
   const graphics = readTilesetGraphics(rom, header);
   
   return {
     ...header,
     blocks,
-    passableTiles,
+    impassableTiles,
     graphicsData: graphics,
     // Helper data
     numBlocks: blocks.length,
-    numPassableTiles: passableTiles.length
+    numImpassableTiles: impassableTiles.length
   };
 }

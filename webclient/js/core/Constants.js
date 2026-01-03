@@ -1,34 +1,35 @@
 // Constants for Pokemon Red Map Viewer
 // Core game constants and configuration values
 
-export const MODULE_VERSION = '1.0.0';
+// Version: Update patch number for bug fixes, minor for new features, major for breaking changes
+export const MODULE_VERSION = '1.0.1';
 
 export const TILE_SIZE = 8; // Each tile is 8x8 pixels
 export const BLOCK_SIZE = 4; // Each block is 4x4 tiles (32x32 pixels)
 
-export const MAP_VIEWER_VERSION = '3.0.2';
-export const MAP_VIEWER_BUILD_DATE = '2026-01-01T03:00:00Z';
-export const BUILD_TIMESTAMP = 1735704000000; // Update manually or via build script
+export const MAP_VIEWER_VERSION = '3.2.0';
+export const MAP_VIEWER_BUILD_DATE = '2026-01-03T08:00:00Z';
+export const BUILD_TIMESTAMP = Date.now(); // Update manually or via build script
 
 // Module versions for tracking
 export const MODULE_VERSIONS = {
     CONSTANTS: '1.0.0',
     CONFIG: '1.0.0',
-    MAP_VIEWER: '1.0.0',
+    MAP_VIEWER: '1.1.0',
     LOGGER: '1.0.0',
     ERROR_HANDLER: '1.0.0',
     VIEWPORT_STATE: '1.0.0',
     MAP_STATE: '1.0.1',
     PREFERENCES_MANAGER: '1.0.0',
     CACHE_MANAGER: '1.0.0',
-    MAP_DATA_MANAGER: '1.0.0',
+    MAP_DATA_MANAGER: '1.0.1',
     TILESET_MANAGER: '1.0.1',
     SPRITE_MANAGER: '1.0.1',
     CANVAS_RENDERER: '1.0.0'
 };
 
-export const MIN_ZOOM = 1;
-export const MAX_ZOOM = 8;
+export const MIN_ZOOM = 0.5; // 5x smaller than original (1 / 5)
+export const MAX_ZOOM = 40; // 5x larger than original (8 * 5)
 export const DEFAULT_ZOOM = 2;
 
 export const DEFAULT_OFFSET_X = 50;
@@ -84,8 +85,14 @@ export const STORAGE_KEYS = {
     SHOW_GRID: 'mapViewerShowGrid',
     SHOW_COORD_LABELS: 'mapViewerShowCoordLabels',
     SHOW_TOOLTIP: 'mapViewerShowTooltip',
+    SHOW_INTERIOR_LAYOUT: 'mapViewerShowInteriorLayout',
+    TILE_OPTIMIZATION: 'mapViewerTileOptimization',
     SIDEBAR_HIDDEN: 'mapViewerSidebarHidden',
     LAST_OVERWORLD_MAP: 'mapViewerLastOverworldMap',
     LAST_OVERWORLD_X: 'mapViewerLastOverworldX',
-    LAST_OVERWORLD_Y: 'mapViewerLastOverworldY'
+    LAST_OVERWORLD_Y: 'mapViewerLastOverworldY',
+    PANEL_MAP_INFO: 'mapViewerPanelMapInfo',
+    PANEL_CONTROLS: 'mapViewerPanelControls',
+    PANEL_LEGEND: 'mapViewerPanelLegend',
+    PANEL_MAP_LIST: 'mapViewerPanelMapList'
 };

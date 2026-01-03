@@ -2,6 +2,7 @@
 import { MIN_ZOOM, MAX_ZOOM, DEFAULT_ZOOM, DEFAULT_OFFSET_X, DEFAULT_OFFSET_Y } from '../core/Constants.js';
 import { Logger } from '../utils/Logger.js';
 
+// Always update version after changes
 export const MODULE_VERSION = '1.0.0';
 
 export class ViewportState {

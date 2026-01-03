@@ -1,6 +1,7 @@
 // Error handling and display utilities
 import { Logger } from './Logger.js';
 
+// Always update version after changes
 export const MODULE_VERSION = '1.0.0';
 
 export class ErrorHandler {

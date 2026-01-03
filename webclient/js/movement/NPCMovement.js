@@ -5,6 +5,9 @@
 
 import { MOVEMENT_TYPES } from '../constants/movementTypes.js';
 
+// Always update version after changes
+export const MODULE_VERSION = '1.0.0';
+
 export class NPCMovementEngine {
     constructor(tilesetManager = null, currentMap = null) {
         this.sprites = [];
@@ -146,11 +149,6 @@ export class NPCMovementEngine {
             return; // No movement
         }
 
-        // Debug log every 60 frames (once per second at 60fps)
-        if (this.animationFrameCounter % 60 === 0) {
-            console.log(`[NPC ${sprite.pictureId}] Status: ${sprite.movementStatus}, Pos: (${sprite.pixelX},${sprite.pixelY}), Facing: ${sprite.facingDirection}`);
-        }
-
         // Handle movement based on status
         if (sprite.movementStatus === 1) {
             // Ready to move
@@ -270,7 +268,6 @@ export class NPCMovementEngine {
     canWalkInDirection(sprite, direction) {
         const movementType = MOVEMENT_TYPES[sprite.movement];
         if (!movementType) {
-            console.log(`[NPC ${sprite.pictureId}] No movement type found`);
             return false;
         }
 
@@ -296,15 +293,12 @@ export class NPCMovementEngine {
                 break;
         }
         
-        console.log(`[NPC ${sprite.pictureId}] Checking move ${direction}: (${currentTileX},${currentTileY}) -> (${targetTileX},${targetTileY})`);
-        
         // Check map bounds (in tiles, each block is 4x4 tiles)
         if (this.currentMap) {
             const maxTileX = this.currentMap.width * 4; // 4 tiles per block width
             const maxTileY = this.currentMap.height * 4; // 4 tiles per block height
             
             if (targetTileX < 0 || targetTileX >= maxTileX || targetTileY < 0 || targetTileY >= maxTileY) {
-                console.log(`[NPC ${sprite.pictureId}] Out of bounds: tile (${targetTileX},${targetTileY}) exceeds map size (${maxTileX}x${maxTileY})`);
                 return false; // Out of bounds
             }
             
@@ -320,8 +314,6 @@ export class NPCMovementEngine {
                 const blockIndex = blockY * this.currentMap.width + blockX;
                 const blockId = this.currentMap.blockData[blockIndex];
                 
-                console.log(`[NPC ${sprite.pictureId}] Block coords: (${blockX},${blockY}), tile in block: (${tileInBlockX},${tileInBlockY}), blockId: ${blockId}`);
-                
                 if (blockId !== undefined) {
                     // Get tile ID from block definition
                     const blockDef = this.tilesetManager.getBlockDefinition(this.currentMap.tileset, blockId);
@@ -329,26 +321,14 @@ export class NPCMovementEngine {
                         // Get tile ID from block's 4x4 structure
                         const tileId = blockDef.tiles[tileInBlockY][tileInBlockX];
                         
-                        console.log(`[NPC ${sprite.pictureId}] Tile coords in block: (${tileInBlockX},${tileInBlockY}), tileId: ${tileId}`);
-                        
                         // Check if tile is walkable
                         const isWalkable = this.tilesetManager.isTileWalkable(this.currentMap.tileset, tileId);
-                        const collisionInfo = this.tilesetManager.getTileCollision(this.currentMap.tileset, tileId);
-                        
-                        console.log(`[NPC ${sprite.pictureId}] Walkable: ${isWalkable}, Collision: ${JSON.stringify(collisionInfo)}`);
                         
                         if (!isWalkable) {
-                            console.log(`[NPC ${sprite.pictureId}] BLOCKED by tile ${tileId} at (${targetTileX},${targetTileY})`);
                             return false; // Tile is blocked
                         }
-                    } else {
-                        console.log(`[NPC ${sprite.pictureId}] No block definition found for blockId ${blockId}`);
                     }
-                } else {
-                    console.log(`[NPC ${sprite.pictureId}] Block ID undefined at index ${blockIndex}`);
                 }
-            } else {
-                console.log(`[NPC ${sprite.pictureId}] No tileset manager or tileset ID available`);
             }
         }
         
@@ -417,8 +397,6 @@ export class NPCMovementEngine {
         
         if (sprite.walkAnimationCounter <= 0) {
             // Walking finished
-            console.log(`[NPC ${sprite.pictureId}] Walk complete: (${sprite.pixelX},${sprite.pixelY}) -> target (${sprite.targetPixelX},${sprite.targetPixelY})`);
-            
             sprite.movementStatus = 1; // Ready for next move
             sprite.xStepVector = 0;
             sprite.yStepVector = 0;
