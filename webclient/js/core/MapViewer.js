@@ -781,21 +781,25 @@ export class MapViewer {
         this.renderSprites(currentMap, offset, scale);
         
         // Draw grid if enabled
-        if (this.showGrid && scale >= 2) {
+        if (this.showGrid) {
             // Calculate visible blocks for grid
             const startX = Math.floor(-offset.x / (BLOCK_SIZE * TILE_SIZE * scale));
             const startY = Math.floor(-offset.y / (BLOCK_SIZE * TILE_SIZE * scale));
             const endX = Math.ceil((this.renderer.getWidth() - offset.x) / (BLOCK_SIZE * TILE_SIZE * scale));
             const endY = Math.ceil((this.renderer.getHeight() - offset.y) / (BLOCK_SIZE * TILE_SIZE * scale));
             
+            // Calculate line width based on zoom level
+            // At scale 2.0+, use 1px; scale down to minimum 0.5px at very low zoom
+            const lineWidth = Math.max(0.5, Math.min(1, scale / 2));
+            
             this.renderer.setAlpha(0.15);
             for (let x = startX; x <= endX; x++) {
                 const screenX = offset.x + x * BLOCK_SIZE * TILE_SIZE * scale;
-                this.renderer.drawLine(screenX, 0, screenX, this.renderer.getHeight(), '#fff', 1);
+                this.renderer.drawLine(screenX, 0, screenX, this.renderer.getHeight(), '#fff', lineWidth);
             }
             for (let y = startY; y <= endY; y++) {
                 const screenY = offset.y + y * BLOCK_SIZE * TILE_SIZE * scale;
-                this.renderer.drawLine(0, screenY, this.renderer.getWidth(), screenY, '#fff', 1);
+                this.renderer.drawLine(0, screenY, this.renderer.getWidth(), screenY, '#fff', lineWidth);
             }
             this.renderer.resetAlpha();
         }
@@ -1245,18 +1249,22 @@ export class MapViewer {
         const endX = Math.ceil((this.renderer.getWidth() - offset.x) / (BLOCK_SIZE * TILE_SIZE * scale));
         const endY = Math.ceil((this.renderer.getHeight() - offset.y) / (BLOCK_SIZE * TILE_SIZE * scale));
         
+        // Calculate line width based on zoom level
+        // At scale 2.0+, use 1px; scale down to minimum 0.5px at very low zoom
+        const lineWidth = Math.max(0.5, Math.min(1, scale / 2));
+        
         this.renderer.setAlpha(0.15);
         
         // Draw vertical grid lines across entire viewport
         for (let x = startX; x <= endX; x++) {
             const screenX = offset.x + x * BLOCK_SIZE * TILE_SIZE * scale;
-            this.renderer.drawLine(screenX, 0, screenX, this.renderer.getHeight(), '#fff', 1);
+            this.renderer.drawLine(screenX, 0, screenX, this.renderer.getHeight(), '#fff', lineWidth);
         }
         
         // Draw horizontal grid lines across entire viewport
         for (let y = startY; y <= endY; y++) {
             const screenY = offset.y + y * BLOCK_SIZE * TILE_SIZE * scale;
-            this.renderer.drawLine(0, screenY, this.renderer.getWidth(), screenY, '#fff', 1);
+            this.renderer.drawLine(0, screenY, this.renderer.getWidth(), screenY, '#fff', lineWidth);
         }
         
         this.renderer.resetAlpha();
