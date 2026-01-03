@@ -393,7 +393,7 @@ export class UIBuilder {
         const button = document.createElement('button');
         button.id = 'toggleSidebarBtn';
         button.className = 'btn btn-primary sidebar-visible';
-        button.innerHTML = '<i class="bi bi-list"></i>';
+        button.textContent = '✕'; // Sidebar visible by default
         
         if (onClick) {
             button.addEventListener('click', onClick);

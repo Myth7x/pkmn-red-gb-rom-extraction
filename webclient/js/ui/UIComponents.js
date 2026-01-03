@@ -35,14 +35,8 @@ export class UIComponents {
             </div>
         `;
         
-        if (collapsible) {
-            const header = card.querySelector('.collapsible-header');
-            const body = card.querySelector('.card-body');
-            header.addEventListener('click', () => {
-                header.classList.toggle('collapsed');
-                body.classList.toggle('collapsed');
-            });
-        }
+        // Note: Event listeners are attached by MapViewer.initCollapsiblePanels()
+        // to properly handle state persistence
         
         return card;
     }
@@ -184,12 +178,8 @@ export class UIComponents {
             </div>
         `;
         
-        const header = div.querySelector('.collapsible-header');
-        const body = div.querySelector('.panel-content');
-        header.addEventListener('click', () => {
-            header.classList.toggle('collapsed');
-            body.classList.toggle('collapsed');
-        });
+        // Note: Event listeners are attached by MapViewer.initCollapsiblePanels()
+        // to properly handle state persistence
         
         return div;
     }

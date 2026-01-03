@@ -142,7 +142,8 @@ export class MapViewer {
                 this.ctx,
                 this.tilesetManager,
                 null, // collisionTileManager - not needed for now
-                this.tileAnimator
+                this.tileAnimator,
+                this.spriteManager
             );
             
             // Sync collision overlay setting with interior renderer
