@@ -11,11 +11,11 @@
         "extract:maps": "node src/index.js maps",
         "extract:names": "node src/index.js names",
         "extract:overworld": "node src/extractOverworldSprites.js",
-        "build": "node build-minified.js",
-        "build:serve": "npm run build && npm run serve:dist",
+        "dev": "node server.js",
+        "dev:minify": "cross-env MINIFY=true node server.js",
         "http-server": "http-server ./ -p 8080",
-        "serve": "http-server ./ -p 8080 -o /webclient/index.html",
-        "serve:dist": "http-server ./webclient-dist -p 8080 -o /index.html",
+        "serve": "node server.js",
+        "serve:minify": "cross-env MINIFY=true node server.js",
         "world-map": "http-server ./ -p 8080 -o /webclient/world-map.html",
         "viewer": "http-server ./ -p 8080 -o /webclient/index.html"
     },
@@ -28,9 +28,12 @@
     "author": "",
     "license": "MIT",
     "dependencies": {
+        "cross-env": "^10.1.0",
         "pngjs": "^7.0.0"
     },
     "devDependencies": {
+        "compression": "^1.8.1",
+        "express": "^5.2.1",
         "html-minifier-terser": "^7.2.0",
         "http-server": "^14.1.1",
         "terser": "^5.44.1"
