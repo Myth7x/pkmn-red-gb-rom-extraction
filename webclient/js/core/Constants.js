@@ -35,8 +35,8 @@ export const DEFAULT_ZOOM = 2;
 export const DEFAULT_OFFSET_X = 50;
 export const DEFAULT_OFFSET_Y = 50;
 
-// Sprite ID validation
-export const MIN_SPRITE_ID = 1;
+// Sprite ID validation - RED sprite is ID 0
+export const MIN_SPRITE_ID = 0;
 export const MAX_SPRITE_ID = 72;
 
 // Overlay colors and styling
@@ -78,6 +78,7 @@ export const GRID_COLOR = 'rgba(255, 255, 255, 0.15)';
 
 // LocalStorage keys
 export const STORAGE_KEYS = {
+    // Map Viewer Mode Keys
     ZOOM: 'mapViewerZoom',
     CURRENT_MAP: 'mapViewerCurrentMap',
     PREVIOUS_MAP: 'mapViewerPreviousMap',
@@ -94,5 +95,17 @@ export const STORAGE_KEYS = {
     PANEL_MAP_INFO: 'mapViewerPanelMapInfo',
     PANEL_CONTROLS: 'mapViewerPanelControls',
     PANEL_LEGEND: 'mapViewerPanelLegend',
-    PANEL_MAP_LIST: 'mapViewerPanelMapList'
+    PANEL_MAP_LIST: 'mapViewerPanelMapList',
+    
+    // Game Mode Keys (separate storage)
+    GAME_CURRENT_MAP: 'gameCurrentMap',
+    GAME_PLAYER_X: 'gamePlayerX',
+    GAME_PLAYER_Y: 'gamePlayerY',
+    GAME_PLAYER_FACING: 'gamePlayerFacing',
+    GAME_ZOOM: 'gameZoom',
+    GAME_PREVIOUS_MAP: 'gamePreviousMap',
+    GAME_SHOW_COLLISION_DEBUG: 'gameShowCollisionDebug',
+    GAME_SHOW_OVERLAYS: 'gameShowOverlays',
+    GAME_SHOW_GRID: 'gameShowGrid',
+    GAME_SHOW_COORD_LABELS: 'gameShowCoordLabels'
 };

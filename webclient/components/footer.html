@@ -1,7 +1,28 @@
-<!-- Version Footer Component -->
-<div id="versionFooter">
-    <div class="main-version">
-        {{appName}} v{{version}} | {{status}} | Maps: <span id="mapsCount">{{mapCount}}</span> | FPS: <span id="fpsDisplay">{{fps}}</span>
+<!-- Game Mode Footer Component -->
+<div id="gameFooter" class="app-footer" style="display: none;">
+    <div class="footer-section">
+        <span class="footer-label">Map:</span>
+        <span id="currentMapName" class="footer-value">Loading...</span>
     </div>
-    <div class="modules">Modules: {{modules}}</div>
+    <div class="footer-section town-navigation" id="townNavigation">
+        <label for="townSelect" class="footer-label">🗺️ Go to:</label>
+        <select id="townSelect" class="form-select form-select-sm">
+            <option value="" disabled selected>Select a town...</option>
+        </select>
+        <button id="navigateToTownBtn" class="btn btn-sm btn-success" disabled>
+            <i class="bi bi-compass"></i> Navigate
+        </button>
+    </div>
+    <div class="footer-section">
+        <span class="footer-label">FPS:</span>
+        <span id="fpsDisplayGame" class="footer-value">--</span>
+    </div>
+</div>
+
+<!-- Map Viewer Mode Footer Component -->
+<div id="mapViewerFooter" class="app-footer" style="display: none;">
+    <div class="main-version">
+        Map Viewer v3.0.2 | Loading... | Maps: <span id="mapsCount">0</span> | FPS: <span id="fpsDisplay">--</span>
+    </div>
+    <div class="modules">Modules: Loading...</div>
 </div>

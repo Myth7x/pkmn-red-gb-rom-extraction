@@ -1,0 +1,11 @@
+<!-- Select Box Component -->
+<div class="custom-select {{class}}">
+    <select id="{{id}}" class="form-select form-select-sm">
+        {{#if placeholder}}
+        <option value="" disabled selected>{{placeholder}}</option>
+        {{/if}}
+        {{#each options}}
+        <option value="{{value}}">{{label}}</option>
+        {{/each}}
+    </select>
+</div>

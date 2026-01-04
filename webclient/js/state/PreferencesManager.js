@@ -3,9 +3,21 @@ import { STORAGE_KEYS } from '../core/Constants.js';
 import { Logger } from '../utils/Logger.js';
 
 // Version: Update patch number for bug fixes, minor for new features, major for breaking changes
-export const MODULE_VERSION = '1.0.1';
+export const MODULE_VERSION = '1.1.0';
 
 export class PreferencesManager {
+    constructor(config = null) {
+        this.config = config; // Optional Config instance to determine mode
+    }
+    
+    /**
+     * Check if currently in game mode
+     * @returns {boolean}
+     */
+    isGameMode() {
+        return this.config && this.config.isGameMode();
+    }
+    
     save(key, value) {
         try {
             localStorage.setItem(key, String(value));
@@ -174,5 +186,148 @@ export class PreferencesManager {
             return this.loadBoolean(STORAGE_KEYS[key], true); // Default to collapsed
         }
         return true; // Default to collapsed if key not found
+    }
+    
+    // ===== GAME MODE SPECIFIC METHODS =====
+    // These use separate storage keys to not interfere with map-viewer mode
+    
+    /**
+     * Save current game state (map, player position, facing)
+     * Only used in game mode
+     */
+    saveGameState(mapId, playerX, playerY, facing = null) {
+        this.save(STORAGE_KEYS.GAME_CURRENT_MAP, mapId);
+        this.save(STORAGE_KEYS.GAME_PLAYER_X, playerX);
+        this.save(STORAGE_KEYS.GAME_PLAYER_Y, playerY);
+        if (facing !== null) {
+            this.save(STORAGE_KEYS.GAME_PLAYER_FACING, facing);
+        }
+        Logger.log(`[Game] Saved state: Map ${mapId}, Position (${playerX}, ${playerY}), Facing ${facing}`);
+    }
+    
+    /**
+     * Load saved game state
+     * Returns null if no saved state exists
+     */
+    loadGameState() {
+        const mapId = this.loadNumber(STORAGE_KEYS.GAME_CURRENT_MAP, null);
+        const playerX = this.loadNumber(STORAGE_KEYS.GAME_PLAYER_X, null);
+        const playerY = this.loadNumber(STORAGE_KEYS.GAME_PLAYER_Y, null);
+        const facing = this.loadNumber(STORAGE_KEYS.GAME_PLAYER_FACING, 0x00); // Default DOWN
+        
+        if (mapId !== null && playerX !== null && playerY !== null) {
+            Logger.log(`[Game] Restored state: Map ${mapId}, Position (${playerX}, ${playerY}), Facing ${facing}`);
+            return { mapId, playerX, playerY, facing };
+        }
+        
+        return null;
+    }
+    
+    /**
+     * Save game mode zoom level
+     */
+    saveGameZoom(zoom) {
+        this.save(STORAGE_KEYS.GAME_ZOOM, zoom);
+        Logger.log(`[Game] Saved zoom level: ${zoom}x`);
+    }
+    
+    /**
+     * Load game mode zoom level
+     */
+    loadGameZoom(defaultZoom = 4) {
+        const value = this.load(STORAGE_KEYS.GAME_ZOOM);
+        const parsed = parseFloat(value);
+        return isNaN(parsed) ? defaultZoom : parsed;
+    }
+    
+    /**
+     * Save previous map for game mode (for warp returns)
+     */
+    saveGamePreviousMap(mapId) {
+        this.save(STORAGE_KEYS.GAME_PREVIOUS_MAP, mapId);
+    }
+    
+    /**
+     * Load previous map for game mode
+     */
+    loadGamePreviousMap() {
+        return this.loadNumber(STORAGE_KEYS.GAME_PREVIOUS_MAP, null);
+    }
+    
+    /**
+     * Save game mode collision debug state
+     */
+    saveGameCollisionDebug(value) {
+        this.save(STORAGE_KEYS.GAME_SHOW_COLLISION_DEBUG, value);
+        Logger.log(`[Game] Collision debug: ${value ? 'ON' : 'OFF'} (saved)`);
+    }
+    
+    /**
+     * Load game mode collision debug state
+     */
+    loadGameCollisionDebug() {
+        return this.loadBoolean(STORAGE_KEYS.GAME_SHOW_COLLISION_DEBUG, false); // Default off
+    }
+    
+    /**
+     * Save game mode overlay settings
+     */
+    saveGameShowOverlays(value) {
+        this.save(STORAGE_KEYS.GAME_SHOW_OVERLAYS, value);
+        Logger.log(`[Game] Overlays: ${value ? 'ON' : 'OFF'} (saved)`);
+    }
+    
+    /**
+     * Load game mode overlay settings
+     */
+    loadGameShowOverlays() {
+        return this.loadBoolean(STORAGE_KEYS.GAME_SHOW_OVERLAYS, false); // Default off
+    }
+    
+    /**
+     * Save game mode grid state
+     */
+    saveGameShowGrid(value) {
+        this.save(STORAGE_KEYS.GAME_SHOW_GRID, value);
+        Logger.log(`[Game] Grid: ${value ? 'ON' : 'OFF'} (saved)`);
+    }
+    
+    /**
+     * Load game mode grid state
+     */
+    loadGameShowGrid() {
+        return this.loadBoolean(STORAGE_KEYS.GAME_SHOW_GRID, false); // Default off
+    }
+    
+    /**
+     * Save game mode coord labels state
+     */
+    saveGameShowCoordLabels(value) {
+        this.save(STORAGE_KEYS.GAME_SHOW_COORD_LABELS, value);
+        Logger.log(`[Game] Coord labels: ${value ? 'ON' : 'OFF'} (saved)`);
+    }
+    
+    /**
+     * Load game mode coord labels state
+     */
+    loadGameShowCoordLabels() {
+        return this.loadBoolean(STORAGE_KEYS.GAME_SHOW_COORD_LABELS, false); // Default off
+    }
+    
+    /**
+     * Clear game state (e.g., on new game)
+     */
+    clearGameState() {
+        localStorage.removeItem(STORAGE_KEYS.GAME_CURRENT_MAP);
+        localStorage.removeItem(STORAGE_KEYS.GAME_PLAYER_X);
+        localStorage.removeItem(STORAGE_KEYS.GAME_PLAYER_Y);
+        localStorage.removeItem(STORAGE_KEYS.GAME_PLAYER_FACING);
+        localStorage.removeItem(STORAGE_KEYS.GAME_ZOOM);
+        localStorage.removeItem(STORAGE_KEYS.GAME_PREVIOUS_MAP);
+        localStorage.removeItem(STORAGE_KEYS.GAME_SHOW_COLLISION_DEBUG);
+        localStorage.removeItem(STORAGE_KEYS.GAME_SHOW_OVERLAYS);
+        localStorage.removeItem(STORAGE_KEYS.GAME_SHOW_GRID);
+        localStorage.removeItem(STORAGE_KEYS.GAME_SHOW_COORD_LABELS);
+        Logger.log(`[Game] Cleared saved game state`);
     }
 }

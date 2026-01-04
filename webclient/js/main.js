@@ -16,9 +16,10 @@ console.log('🔄 Cache Buster:', CACHE_BUSTER);
 
 /**
  * Build the application UI dynamically
+ * @param {string} mode - Application mode: 'map-viewer' or 'game'
  */
-function buildUI() {
-    console.log('🎨 Building UI...');
+function buildUI(mode = 'map-viewer') {
+    console.log('🎨 Building UI for mode:', mode);
     
     const app = document.getElementById('app');
     
@@ -26,7 +27,27 @@ function buildUI() {
     const container = document.createElement('div');
     container.id = 'container';
     
-    // Build and append UI components
+    // In game mode, only create canvas
+    if (mode === 'game') {
+        const canvas = document.createElement('canvas');
+        canvas.id = 'mapCanvas';
+        container.appendChild(canvas);
+        app.appendChild(container);
+        
+        // Add loading spinner
+        const loadingEl = document.getElementById('loading');
+        if (!loadingEl) {
+            app.appendChild(UIBuilder.buildLoadingSpinner());
+        }
+        
+        // Add version footer with town navigation for game mode
+        app.appendChild(UIBuilder.buildVersionFooter(true));
+        
+        console.log('✅ Game UI built successfully');
+        return;
+    }
+    
+    // Map-viewer mode: Build full UI
     const sidebarToggle = UIBuilder.buildSidebarToggle(null); // Handler will be set later
     const sidebar = UIBuilder.buildSidebar({}); // Handlers will be set by MapViewer
     const canvas = document.createElement('canvas');
@@ -59,15 +80,17 @@ function buildUI() {
 
 /**
  * Initialize the Map Viewer application
+ * @param {string} mode - Application mode: 'map-viewer' or 'game'
  */
-async function initMapViewer() {
+async function initMapViewer(mode = 'map-viewer') {
     try {
         console.log('🎮 Initializing Pokemon Red Map Viewer...');
+        console.log('📋 Mode:', mode);
         
         // Build UI first
-        buildUI();
+        buildUI(mode);
         
-        const viewer = new MapViewer('mapCanvas');
+        const viewer = new MapViewer('mapCanvas', mode);
         await viewer.init();
         
         // Expose to window for debugging and external access
@@ -147,8 +170,18 @@ function startMemoryMonitor(viewer) {
 
 // Initialize when DOM is ready
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initMapViewer);
+    document.addEventListener('DOMContentLoaded', () => {
+        // Get mode from URL parameter or data attribute
+        const urlParams = new URLSearchParams(window.location.search);
+        const mode = urlParams.get('mode') || document.body.dataset.mode || 'map-viewer';
+        initMapViewer(mode);
+    });
 } else {
     // DOM already ready
-    initMapViewer();
+    const urlParams = new URLSearchParams(window.location.search);
+    const mode = urlParams.get('mode') || document.body.dataset.mode || 'map-viewer';
+    initMapViewer(mode);
 }
+
+// Export initMapViewer for external use
+window.initMapViewer = initMapViewer;

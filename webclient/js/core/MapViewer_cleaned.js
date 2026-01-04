@@ -1,4 +1,4 @@
-﻿// Main Map Viewer Application Controller
+// Main Map Viewer Application Controller
 import { MAP_VIEWER_VERSION, MAP_VIEWER_BUILD_DATE, TILE_SIZE, BLOCK_SIZE, MODULE_VERSIONS, getMovementInfo, MIN_ZOOM, MAX_ZOOM, DEFAULT_OFFSET_X, DEFAULT_OFFSET_Y } from './Constants.js';
 import { Config } from './Config.js';
 import { Logger } from '../utils/Logger.js';
@@ -19,7 +19,6 @@ import { InteriorMapLayoutManager } from '../layout/InteriorMapLayoutManager.js'
 import { InteriorMapRenderer } from '../rendering/InteriorMapRenderer.js';
 import { Player } from '../player/Player.js';
 import { Camera } from '../camera/Camera.js';
-import { NotificationManager } from '../ui/NotificationManager.js';
 
 // Import module versions
 import { MODULE_VERSION as CONFIG_VERSION } from './Config.js';
@@ -38,13 +37,16 @@ import { MODULE_VERSION as NPC_MOVEMENT_VERSION } from '../movement/NPCMovement.
 import { MODULE_VERSION as TILE_ANIMATOR_VERSION } from '../animation/TileAnimator.js';
 import { MODULE_VERSION as INTERIOR_LAYOUT_VERSION } from '../layout/InteriorMapLayoutManager.js';
 import { MODULE_VERSION as INTERIOR_RENDERER_VERSION } from '../rendering/InteriorMapRenderer.js';
-import { MODULE_VERSION as NOTIFICATION_VERSION } from '../ui/NotificationManager.js';
 
 // Always update version after changes
 export const MODULE_VERSION = '1.6.0';
 
 export class MapViewer {
     constructor(canvasId, mode = 'map-viewer') {
+
+        Logger.log(`Version ${MAP_VIEWER_VERSION} (Build: ${MAP_VIEWER_BUILD_DATE})`);
+
+        
         // Core configuration
         this.config = new Config(mode);
         this.mode = mode;
@@ -69,9 +71,6 @@ export class MapViewer {
         this.mapDataManager = new MapDataManager(this.config);
         this.tilesetManager = new TilesetManager(this.config);
         this.spriteManager = new SpriteManager(this.config);
-        
-        // Map cache for game mode (preloads all maps)
-        this.mapCache = null; // Will be initialized in game mode
         
         // Animation system
         this.tileAnimator = new TileAnimator(this.config);
@@ -100,28 +99,17 @@ export class MapViewer {
         this.player = null;
         this.camera = null;
         
-        // Notification system (only for game mode)
-        this.notificationManager = null;
-        if (this.config.isGameMode()) {
-            this.notificationManager = new NotificationManager();
-        }
-        
-        // Multi-map path visualization
-        this.crossMapPaths = null; // Will store {currentMapPath: [...], neighborPaths: {mapId: [...]}}
-        
         // UI state - different defaults for game mode vs map-viewer mode
         if (this.config.isGameMode()) {
-            // Game mode: Load saved settings or use defaults
-            this.showCollisionDebug = this.preferences.loadGameCollisionDebug();
-            this.showOverlays = this.preferences.loadGameShowOverlays();
-            this.showGrid = this.preferences.loadGameShowGrid();
-            this.showCoordLabels = this.preferences.loadGameShowCoordLabels();
+            // Game mode: Minimal debug UI, no overlays by default
+            this.showOverlays = false;
+            this.showGrid = false;
+            this.showCoordLabels = false;
             this.showTooltip = false;
             this.showingInteriorLayout = false; // Disable interior layout in game mode
             this.tileOptimizationEnabled = false; // Disabled for game mode
         } else {
             // Map-viewer mode: Use config defaults (will be overridden by preferences)
-            this.showCollisionDebug = false; // Not used in map-viewer mode
             this.showOverlays = this.config.defaults.showOverlays;
             this.showGrid = this.config.defaults.showGrid;
             this.showCoordLabels = this.config.defaults.showCoordLabels;
@@ -156,6 +144,8 @@ export class MapViewer {
     
     async init() {
         try {
+
+            
             // Initialize error handler
             this.errorHandler.init();
             
@@ -227,31 +217,27 @@ export class MapViewer {
      * Initialize game mode specific components
      */
     async initGameMode() {
+
+        
         // Import Player and Camera modules
         const { Player } = await import('../player/Player.js');
         const { Camera } = await import('../camera/Camera.js');
         const { Pathfinding } = await import('../utils/Pathfinding.js');
-        const { MapCache } = await import('../data/MapCache.js');
-        const { MultiMapPathfinder } = await import('../pathfinding/MultiMapPathfinder.js');
-        
-        // Initialize map cache (preloads all maps)
-        Logger.log('🗺️ Initializing map cache...');
-        this.mapCache = new MapCache(this.config, this.mapDataManager);
-        await this.mapCache.preloadAll();
         
         // Preload RED sprite (sprite ID 0)
         await this.spriteManager.loadSprite(0);
-        // Initialize player with tileset manager for collision detection, mapCache, and mapStitcher for seamless world
-        this.player = new Player(this.spriteManager, this.mapDataManager, this.tilesetManager, this.mapCache, this.mapStitcher);
+        Logger.log('Player sprite (RED) loaded');
+        
+        // Initialize player with tileset manager for collision detection
+        this.player = new Player(this.spriteManager, this.mapDataManager, this.tilesetManager);
         
         // Initialize pathfinding
         this.pathfinding = new Pathfinding(this.player, this.tilesetManager);
         
-        // Initialize multi-map pathfinder
-        this.multiMapPathfinder = new MultiMapPathfinder(this.mapCache, this.pathfinding, this.player);
-        
         // Load saved zoom level for game mode, or use default
         const savedZoom = this.preferences.loadGameZoom(this.config.defaults.zoom);
+
+        
         // Initialize camera with saved zoom
         this.camera = new Camera(this.canvas);
         this.camera.setZoom(savedZoom);
@@ -273,16 +259,11 @@ export class MapViewer {
         
         if (!townSelect || !navigateBtn) return;
         
-        // Get towns from cache if available, otherwise filter from maps array
-        let towns;
-        if (this.mapCache && this.mapCache.isReady()) {
-            towns = this.mapCache.getTowns();
-        } else {
-            towns = maps.filter(m => 
-                m.name.includes('Town') || m.name.includes('City') || 
-                m.name.includes('Island') || m.name.includes('Plateau')
-            ).sort((a, b) => a.mapId - b.mapId);
-        }
+        // Filter for towns and cities
+        const towns = maps.filter(m => 
+            m.name.includes('Town') || m.name.includes('City') || 
+            m.name.includes('Island') || m.name.includes('Plateau')
+        ).sort((a, b) => a.mapId - b.mapId);
         
         // Populate dropdown
         towns.forEach(town => {
@@ -304,6 +285,8 @@ export class MapViewer {
                 this.navigateToTown(selectedMapId);
             }
         });
+        
+
     }
     
     /**
@@ -319,111 +302,69 @@ export class MapViewer {
                 return;
             }
             
-            // Get target map name for logging
-            const targetMap = this.mapCache ? this.mapCache.getMap(targetMapId) : null;
-            const targetName = targetMap ? targetMap.name : `Map ${targetMapId}`;
-            
-            Logger.log(`🎮 Navigation Request: ${currentMap.name} (Map ${currentMap.mapId}) → ${targetName} (Map ${targetMapId})`);
-            
-            // Check if map cache is ready
-            if (!this.mapCache || !this.mapCache.isReady()) {
-                Logger.error('Map cache not ready. Please wait for initialization.');
-                return;
-            }
-            
-            // Get current player GLOBAL position
-            const startX = this.player.getGlobalX();
-            const startY = this.player.getGlobalY();
-            
-            Logger.log(`🎯 Current position: Global (${startX}, ${startY}) on ${currentMap.name}`);
-            
-            // If already on the target map, navigate to center
+            // If already on the target map, just center camera
             if (currentMap.mapId === targetMapId) {
-                // Find walkable tile on target map (returns LOCAL coordinates)
-                const walkableTile = this.mapCache.findWalkableTile(targetMapId, this.player);
-                if (walkableTile && (walkableTile.x !== this.player.state.x || walkableTile.y !== this.player.state.y)) {
-                    Logger.log(`🎯 Already on ${targetName}, navigating to center tile Local(${walkableTile.x}, ${walkableTile.y})`);
-                    
-                    // Convert local target to global
-                    const globalTarget = this.mapCache.localToGlobal(targetMapId, walkableTile.x, walkableTile.y);
-                    if (!globalTarget) {
-                        Logger.error('Failed to convert target to global coordinates');
-                        return;
-                    }
-                    
-                    Logger.log(`🎯 Target global position: (${globalTarget.x}, ${globalTarget.y})`);
-                    
-                    // Find path using GLOBAL coordinates
-                    const path = this.pathfinding.findPath(
-                        startX, startY,
-                        globalTarget.x, globalTarget.y,
-                        currentMap,
-                        true  // Use global coordinates
-                    );
-                    
-                    if (path && path.length > 0) {
-                        this.player.setPath(path, true);  // true = global path
-                        Logger.success(`✅ Path set! ${path.length} steps to center of ${targetName}`);
-                    } else {
-                        Logger.warn('No path found to center tile');
-                    }
-                } else {
-                    this.camera.focusOnPlayer(this.player.state.pixelX, this.player.state.pixelY);
-                    Logger.info('✅ Already at destination');
+
+                this.camera.focusOnPlayer(this.player.state.pixelX, this.player.state.pixelY);
+                return;
+            }
+            
+            // Check if target map is directly connected
+            const connections = currentMap.connections;
+            let targetConnection = null;
+            
+            if (connections.north && connections.north.mapId === targetMapId) {
+                targetConnection = { direction: 'north', data: connections.north };
+            } else if (connections.south && connections.south.mapId === targetMapId) {
+                targetConnection = { direction: 'south', data: connections.south };
+            } else if (connections.west && connections.west.mapId === targetMapId) {
+                targetConnection = { direction: 'west', data: connections.west };
+            } else if (connections.east && connections.east.mapId === targetMapId) {
+                targetConnection = { direction: 'east', data: connections.east };
+            }
+            
+            if (targetConnection) {
+                // Calculate entry point into connected map
+                const playerX = this.player.state.x;
+                const playerY = this.player.state.y;
+                let targetX, targetY;
+                
+                if (targetConnection.direction === 'north') {
+                    const offset = -targetConnection.data.xAlignment / 2;
+                    targetX = playerX - offset;
+                    targetY = (currentMap.height * 2) - 1; // Bottom of current map, enters top of target
+                } else if (targetConnection.direction === 'south') {
+                    const offset = -targetConnection.data.xAlignment / 2;
+                    targetX = playerX - offset;
+                    targetY = 0; // Top of current map, enters bottom of target
+                } else if (targetConnection.direction === 'west') {
+                    const offset = -targetConnection.data.yAlignment / 2;
+                    targetX = (currentMap.width * 2) - 1; // Right of current map, enters left of target
+                    targetY = playerY - offset;
+                } else if (targetConnection.direction === 'east') {
+                    const offset = -targetConnection.data.yAlignment / 2;
+                    targetX = 0; // Left of current map, enters right of target
+                    targetY = playerY - offset;
                 }
-                return;
-            }
-            
-            // CROSS-MAP NAVIGATION using global coordinates
-            
-            // Find walkable tile on target map (returns LOCAL coordinates)
-            const walkableTile = this.mapCache.findWalkableTile(targetMapId, this.player);
-            if (!walkableTile) {
-                Logger.error(`❌ No walkable tile found on ${targetName}`);
-                return;
-            }
-            
-            Logger.log(`🎯 Target tile on ${targetName}: Local(${walkableTile.x}, ${walkableTile.y})`);
-            
-            // Convert target LOCAL coordinates to GLOBAL
-            const globalTarget = this.mapCache.localToGlobal(targetMapId, walkableTile.x, walkableTile.y);
-            if (!globalTarget) {
-                Logger.error(`❌ Failed to convert target to global coordinates`);
-                return;
-            }
-            
-            Logger.log(`🎯 Target global position: (${globalTarget.x}, ${globalTarget.y})`);
-            
-            // Check if target is walkable
-            if (!this.player.isWalkable(globalTarget.x, globalTarget.y, null, true)) {
-                Logger.error(`❌ Target position (${globalTarget.x}, ${globalTarget.y}) is not walkable`);
-                return;
-            }
-            
-            Logger.log(`🔍 Finding global path from (${startX}, ${startY}) to (${globalTarget.x}, ${globalTarget.y})...`);
-            
-            // Find path using GLOBAL coordinates - automatically handles cross-map pathfinding
-            const path = this.pathfinding.findPath(
-                startX, startY,
-                globalTarget.x, globalTarget.y,
-                currentMap,
-                true  // Use global coordinates
-            );
-            
-            if (path && path.length > 0) {
-                Logger.success(`✅ Path found! ${path.length} steps to ${targetName}`);
                 
-                // Set path with global coordinates flag
-                this.player.setPath(path, true);  // true = global path
+
+                Logger.log(`🎯 Target position: (${targetX}, ${targetY}) in player units`);
                 
-                Logger.info(`🚶 Navigation started to ${targetName}`);
+                // Find path to the boundary
+                const path = this.pathfinding.findPath(playerX, playerY, targetX, targetY, currentMap);
+                
+                if (path && path.length > 0) {
+                    this.player.setPath(path);
+                    Logger.success(`✅ Path found! ${path.length} steps to ${targetConnection.direction} boundary`);
+                } else {
+                    Logger.error(`❌ No path found to ${targetConnection.direction} boundary`);
+                }
             } else {
-                Logger.error(`❌ No path found to ${targetName}. Maps may not be connected or target is unreachable.`);
+                Logger.warn(`⚠️ Map ${targetMapId} is not directly connected. Please warp there or travel manually.`);
             }
             
         } catch (error) {
             Logger.error('Error navigating to town:', error);
-            console.error(error);
         }
     }
     
@@ -433,39 +374,30 @@ export class MapViewer {
      */
     async handleWarp(warp) {
         try {
+
+            
             let targetMapId = warp.mapId;
             let targetWarpId = warp.destWarpId;
             
-            console.log(`[Warp] Player triggered warp:`, {
-                fromX: warp.x,
-                fromY: warp.y,
-                destMapId: targetMapId,
-                destWarpId: targetWarpId,
-                currentMapId: this.mapState.currentMap?.mapId
-            });
-            
-            // Lock player movement during transition
-            this.player.lockMovement(200);
-            
             // Handle map 255 - return to source overworld map
             if (warp.mapId === 255) {
+
                 const currentMap = this.mapState.currentMap;
                 const sourceMap = await this.mapDataManager.findSourceOverworldMap(currentMap.mapId);
                 
                 if (sourceMap) {
+                    Logger.log(`Returning to map ${sourceMap.mapId} at (${sourceMap.x}, ${sourceMap.y})`);
+                    
                     // Load the source map without spawning player
                     await this.loadMap(sourceMap.mapId, { skipPlayerSpawn: true });
                     
                     const destMap = this.mapState.currentMap;
                     
                     // Spawn player at the source warp position
-                    // Warp coordinates are ALREADY in player units (same as sprite coordinates)
-                    const spawnX = sourceMap.x;
-                    const spawnY = sourceMap.y;
-                    this.player.spawn(spawnX, spawnY, destMap.mapId, destMap.name, this.preferences);
+                    this.player.spawn(sourceMap.x, sourceMap.y, destMap.mapId, destMap.name, this.preferences);
                     
                     // Set spawn warp to prevent immediate re-warping
-                    this.player.setSpawnWarp(spawnX, spawnY, destMap.mapId);
+                    this.player.setSpawnWarp(sourceMap.x, sourceMap.y, destMap.mapId);
                     
                     // Update camera boundaries and center on player
                     this.camera.setMapBoundaries(destMap.widthPixels, destMap.heightPixels);
@@ -506,23 +438,18 @@ export class MapViewer {
                 return;
             }
             
-        // Spawn player at the destination warp position
-        // Warp coordinates from ROM are ALREADY in player units (same as sprite coordinates)
-        const spawnX = destWarp.x;
-        const spawnY = destWarp.y;
-        
-        console.log(`[Warp] Spawning at dest warp:`, {
-            warpId: destWarp.warpId || destWarp.destWarpId,
-            'destWarp.x (player units)': destWarp.x,
-            'destWarp.y (player units)': destWarp.y,
-            spawnX,
-            spawnY,
-            mapId: destMap.mapId,
-            mapName: destMap.name,
-            mapSize: `${destMap.width}×${destMap.height} blocks`
-        });
-        
-        this.player.spawn(spawnX, spawnY, destMap.mapId, destMap.name, this.preferences);            // Set spawn warp to prevent immediate re-warping
+            // Spawn player at the destination warp position
+            // Warp coordinates in ROM are stored in different coordinate units
+            // Need to convert from tile coordinates to player units
+            const spawnX = destWarp.x;
+            const spawnY = destWarp.y;
+            
+            Logger.log(`[Warp] Destination warp coordinates: (${spawnX}, ${spawnY})`);
+
+            
+            this.player.spawn(spawnX, spawnY, destMap.mapId, destMap.name, this.preferences);
+            
+            // Set spawn warp to prevent immediate re-warping
             this.player.setSpawnWarp(spawnX, spawnY, destMap.mapId);
             
             // Update camera boundaries and center on player
@@ -540,7 +467,7 @@ export class MapViewer {
     }
     
     /**
-     * Handle boundary crossing - switch to connected map and transfer player
+     * Handle boundary crossing - load connected map and transfer player
      * @param {Object} boundaryData - Boundary crossing data {direction, connection, playerX, playerY}
      */
     async handleBoundaryTransition(boundaryData) {
@@ -548,16 +475,13 @@ export class MapViewer {
             const { direction, connection, playerX, playerY } = boundaryData;
             const currentMap = this.mapState.currentMap;
             
-            // Get the connected map from cache (instant, no loading needed)
-            const newMap = this.mapCache.getMap(connection.connectedMap);
+
+
             
-            if (!newMap) {
-                Logger.error(`❌ Connected map ${connection.connectedMap} not found in cache!`);
-                return;
-            }
+            // Load the connected map without spawning player
+            await this.loadMap(connection.connectedMap, { skipPlayerSpawn: true });
             
-            // Set as current map (no async loading, just switch)
-            this.mapState.currentMap = newMap;
+            const newMap = this.mapState.currentMap;
             
             // Calculate player position in new map based on boundary crossing
             // The alignment values represent how the maps are offset relative to each other
@@ -580,406 +504,56 @@ export class MapViewer {
             const mapOffsetYPlayerUnits = mapOffsetY * 2;
             
             if (direction === 'north') {
-                // Crossed top boundary (Y < 0, e.g., Y = -1)
+                // Crossed top boundary (Y < 0)
+                // The new map is positioned above at offsetY = -newMap.height with horizontal offset
+                // Player's X relative to new map origin = playerX - mapOffsetX
                 newPlayerX = playerX - mapOffsetXPlayerUnits;
-                newPlayerY = newMapHeightPlayerUnits + playerY; // playerY is negative, so this subtracts
+                newPlayerY = newMapHeightPlayerUnits - 1;
+
             } else if (direction === 'south') {
-                // Crossed bottom boundary (Y >= mapHeight, e.g., Y = 18 for 9-block map)
+                // Crossed bottom boundary (Y >= height)
+                // The new map is positioned below at offsetY = currentMap.height with horizontal offset
+                // Player's X relative to new map origin = playerX - mapOffsetX
                 newPlayerX = playerX - mapOffsetXPlayerUnits;
-                newPlayerY = playerY - currentMapHeightPlayerUnits;
+                newPlayerY = 0;
+
             } else if (direction === 'west') {
-                // Crossed left boundary (X < 0, e.g., X = -1)
-                newPlayerX = newMapWidthPlayerUnits + playerX; // playerX is negative
+                // Crossed left boundary (X < 0)
+                // The new map is positioned to the left at offsetX = -newMap.width with vertical offset
+                // Player's Y relative to new map origin = playerY - mapOffsetY
+                newPlayerX = newMapWidthPlayerUnits - 1;
                 newPlayerY = playerY - mapOffsetYPlayerUnits;
+
             } else if (direction === 'east') {
-                // Crossed right boundary (X >= mapWidth, e.g., X = 20 for 10-block map)
-                newPlayerX = playerX - currentMapWidthPlayerUnits;
+                // Crossed right boundary (X >= width)
+                // The new map is positioned to the right at offsetX = currentMap.width with vertical offset
+                // Player's Y relative to new map origin = playerY - mapOffsetY
+                newPlayerX = 0;
                 newPlayerY = playerY - mapOffsetYPlayerUnits;
+
             }
             
             // Clamp position to new map boundaries
             newPlayerX = Math.max(0, Math.min(newPlayerX, newMapWidthPlayerUnits - 1));
             newPlayerY = Math.max(0, Math.min(newPlayerY, newMapHeightPlayerUnits - 1));
             
-            // Calculate the pixel offset within the current tile (for smooth sub-tile movement)
-            const pixelOffsetX = this.player.state.pixelX - (playerX * 16);
-            const pixelOffsetY = this.player.state.pixelY - (playerY * 16);
+            Logger.log(`📍 Transferring player from (${playerX}, ${playerY}) to (${newPlayerX}, ${newPlayerY})`);
             
-            // Calculate new pixel position in new map's coordinate system
-            const newPixelX = (newPlayerX * 16) + pixelOffsetX;
-            const newPixelY = (newPlayerY * 16) + pixelOffsetY;
+            // Spawn player at new position
+            this.player.spawn(newPlayerX, newPlayerY, newMap.mapId, newMap.name, this.preferences, this.player.state.facing);
             
-            console.log(`[Boundary] 🎮 Player transition: (${playerX}, ${playerY}) → (${newPlayerX}, ${newPlayerY})`);
-            console.log(`[Boundary] 🎮 Pixel transition: (${this.player.state.pixelX}, ${this.player.state.pixelY}) → (${newPixelX}, ${newPixelY})`);
-            
-            // Update player position smoothly - maintain the pixel offset for continuous movement
-            this.player.state.x = newPlayerX;
-            this.player.state.y = newPlayerY;
-            this.player.state.pixelX = newPixelX;
-            this.player.state.pixelY = newPixelY;
-            this.player.state.mapId = newMap.mapId;
-            this.player.state.mapName = newMap.name;
-            
-            // Update camera boundaries
+            // Update camera boundaries and center on player
             this.camera.setMapBoundaries(newMap.widthPixels, newMap.heightPixels);
             this.camera.setZoom(this.viewportState.scale);
+            this.camera.focusOnPlayer(this.player.state.pixelX, this.player.state.pixelY);
+            this.camera.setPosition(this.camera.targetOffsetX, this.camera.targetOffsetY);
             
-            // Let camera naturally follow player
-            this.camera.focusOnPlayer(newPixelX, newPixelY);
-            
-            Logger.success(`✅ Boundary transition: ${currentMap.name} → ${newMap.name} at (${newPlayerX}, ${newPlayerY})`);
-            
-            // NEW: Check if using MovementQueue system
-            const movementQueue = this.player.getMovementQueue();
-            if (movementQueue.isQueueActive()) {
-                // Advance to next segment in queue
-                const success = movementQueue.advanceToNextMap(newMap.mapId);
-                
-                if (!success) {
-                    // Queue complete or error
-                    this.crossMapPaths = null;
-                    this.player.navigationRoute = null;
-                }
-                // Queue automatically manages the next path segment
-                return;
-            }
-            
-            // LEGACY: Old multi-hop navigation system (for backwards compatibility)
-            if (this.player.mapPathQueue && this.player.mapPathQueue.length > 0) {
-                this.player.currentQueueIndex++;
-                
-                if (this.player.currentQueueIndex < this.player.mapPathQueue.length) {
-                    const nextPathData = this.player.mapPathQueue[this.player.currentQueueIndex];
-                    
-                    if (nextPathData.mapId === newMap.mapId) {
-                        this.player.setPath(nextPathData.path);
-                        Logger.success(`✅ Loaded next path segment: ${nextPathData.path.length} steps on map ${nextPathData.mapId}`);
-                        return;
-                    } else {
-                        Logger.warn(`⚠️ Path queue mismatch: expected map ${nextPathData.mapId}, got ${newMap.mapId}`);
-                    }
-                } else {
-                    Logger.success(`🎉 Completed all path segments in queue!`);
-                    this.player.mapPathQueue = null;
-                    this.player.currentQueueIndex = 0;
-                    this.player.navigationRoute = null;
-                    this.crossMapPaths = null;
-                    return;
-                }
-            }
-            
-            // LEGACY: Even older navigation route system
-            if (this.player.navigationRoute && this.player.navigationRoute.length > 0) {
-                Logger.info('🗺️ Continuing multi-hop navigation (legacy)...');
-                
-                const currentRouteIndex = this.player.navigationRoute.findIndex(hop => hop.mapId === newMap.mapId);
-                
-                if (currentRouteIndex >= 0 && currentRouteIndex < this.player.navigationRoute.length - 1) {
-                    // Navigate to next hop - find path to boundary
-                    const nextHop = this.player.navigationRoute[currentRouteIndex + 1];
-                    const direction = nextHop.direction;
-                    
-                    Logger.info(`🧭 Next step: Head ${direction.toUpperCase()} to reach ${nextHop.mapId}`);
-                    
-                    // Find target at boundary
-                    let targetX, targetY;
-                    if (direction === 'north') targetY = 0;
-                    else if (direction === 'south') targetY = (newMap.height * 2) - 1;
-                    else if (direction === 'west') targetX = 0;
-                    else if (direction === 'east') targetX = (newMap.width * 2) - 1;
-                    
-                    targetX = targetX ?? newPlayerX;
-                    targetY = targetY ?? newPlayerY;
-                    
-                    // Find path to boundary
-                    const path = this.pathfinding.findPath(newPlayerX, newPlayerY, targetX, targetY, newMap);
-                    
-                    if (path && path.length > 0) {
-                        this.player.setPath(path);
-                        Logger.success(`✅ Path set! ${path.length} steps to continue route`);
-                    } else {
-                        Logger.error(`❌ Cannot find path to continue route`);
-                        this.player.navigationRoute = null;
-                        this.crossMapPaths = null;
-                    }
-                } else if (currentRouteIndex === this.player.navigationRoute.length - 1) {
-                    // Reached destination map
-                    Logger.success(`🎉 Reached destination map: ${newMap.name}`);
-                    this.player.navigationRoute = null;
-                    this.player.finalDestination = null;
-                    this.crossMapPaths = null;
-                } else {
-                    Logger.warn('⚠️ Current map not found in navigation route');
-                    this.player.navigationRoute = null;
-                    this.crossMapPaths = null;
-                }
-            }
+            Logger.success(`✅ Boundary transition complete: ${currentMap.name} → ${newMap.name}`);
             
         } catch (error) {
             Logger.error(`Failed to handle boundary transition: ${error.message}`);
             console.error(error);
         }
-    }
-    
-    /**
-     * Build cross-map path visualization for multi-hop navigation
-     * Creates separate paths for each map with boundary-crossing steps
-     * @param {Array} mapPath - Array of map hops with directions
-     */
-    buildCrossMapPaths(mapPath) {
-        if (!mapPath || mapPath.length < 2) {
-            this.crossMapPaths = null;
-            this.player.continuousPath = null;
-            this.player.mapPathQueue = null;
-            return;
-        }
-        
-        Logger.log(`🗺️ Building cross-map paths for ${mapPath.length} hops...`);
-        
-        // Build separate paths for each map, to be executed in sequence
-        const mapPathQueue = []; // Array of {mapId, path: [{x, y}]} objects
-        const paths = {}; // Store per-map for rendering visualization
-        
-        // For each hop in the route, calculate the path
-        for (let i = 0; i < mapPath.length; i++) {
-            const hop = mapPath[i];
-            const mapData = this.mapCache.getMap(hop.mapId);
-            
-            if (!mapData) {
-                Logger.warn(`  ⚠️ Map ${hop.mapId} not found in cache`);
-                continue;
-            }
-            
-            // Determine start and end points for this hop in local map coordinates
-            let startX, startY, endX, endY;
-            
-            if (i === 0) {
-                // First hop - start from player position
-                startX = this.player.state.x;
-                startY = this.player.state.y;
-            } else {
-                // Subsequent hops - start from entry point based on previous hop's direction
-                const prevHop = mapPath[i - 1];
-                const prevDirection = prevHop.direction;
-                const prevMap = this.mapCache.getMap(prevHop.mapId);
-                const prevConnection = prevMap?.connectionHeaders?.[prevDirection];
-                
-                if (prevConnection && prevDirection) {
-                    // Calculate entry point based on alignment and direction
-                    if (prevDirection === 'north') {
-                        startX = -prevConnection.xAlignment;
-                        startY = (mapData.height * 2) - 1;
-                        // Find walkable tile nearby
-                        for (let r = 0; r <= 5; r++) {
-                            if (r === 0) {
-                                if (this.player.isWalkable(startX, startY, mapData)) break;
-                            } else {
-                                for (const dx of [-r, r]) {
-                                    const testX = startX + dx;
-                                    if (testX >= 0 && testX < mapData.width * 2 && this.player.isWalkable(testX, startY, mapData)) {
-                                        startX = testX;
-                                        r = 999;
-                                        break;
-                                    }
-                                }
-                            }
-                        }
-                    } else if (prevDirection === 'south') {
-                        startX = -prevConnection.xAlignment;
-                        startY = 0;
-                        for (let r = 0; r <= 5; r++) {
-                            if (r === 0) {
-                                if (this.player.isWalkable(startX, startY, mapData)) break;
-                            } else {
-                                for (const dx of [-r, r]) {
-                                    const testX = startX + dx;
-                                    if (testX >= 0 && testX < mapData.width * 2 && this.player.isWalkable(testX, startY, mapData)) {
-                                        startX = testX;
-                                        r = 999;
-                                        break;
-                                    }
-                                }
-                            }
-                        }
-                    } else if (prevDirection === 'west') {
-                        startX = (mapData.width * 2) - 1;
-                        startY = -prevConnection.yAlignment;
-                        for (let r = 0; r <= 5; r++) {
-                            if (r === 0) {
-                                if (this.player.isWalkable(startX, startY, mapData)) break;
-                            } else {
-                                for (const dy of [-r, r]) {
-                                    const testY = startY + dy;
-                                    if (testY >= 0 && testY < mapData.height * 2 && this.player.isWalkable(startX, testY, mapData)) {
-                                        startY = testY;
-                                        r = 999;
-                                        break;
-                                    }
-                                }
-                            }
-                        }
-                    } else if (prevDirection === 'east') {
-                        startX = 0;
-                        startY = -prevConnection.yAlignment;
-                        for (let r = 0; r <= 5; r++) {
-                            if (r === 0) {
-                                if (this.player.isWalkable(startX, startY, mapData)) break;
-                            } else {
-                                for (const dy of [-r, r]) {
-                                    const testY = startY + dy;
-                                    if (testY >= 0 && testY < mapData.height * 2 && this.player.isWalkable(startX, testY, mapData)) {
-                                        startY = testY;
-                                        r = 999;
-                                        break;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                } else {
-                    Logger.warn(`  ⚠️ No connection data for hop ${i}`);
-                    continue;
-                }
-            }
-            
-            // Determine end point for this hop
-            if (i === mapPath.length - 1) {
-                // Last hop - use final destination
-                if (this.player.finalDestination && this.player.finalDestination.mapId === hop.mapId) {
-                    endX = this.player.finalDestination.x;
-                    endY = this.player.finalDestination.y;
-                } else {
-                    endX = Math.floor(mapData.width);
-                    endY = Math.floor(mapData.height);
-                }
-            } else {
-                // Intermediate hop - end at boundary crossing point
-                const direction = hop.direction;
-                const connection = mapData.connectionHeaders?.[direction];
-                
-                if (direction === 'north') {
-                    endY = 0;
-                    endX = connection ? -connection.xAlignment : startX;
-                    for (let r = 0; r <= 5; r++) {
-                        if (r === 0) {
-                            if (this.player.isWalkable(endX, endY, mapData)) break;
-                        } else {
-                            for (const dx of [-r, r]) {
-                                const testX = endX + dx;
-                                if (testX >= 0 && testX < mapData.width * 2 && this.player.isWalkable(testX, endY, mapData)) {
-                                    endX = testX;
-                                    r = 999;
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                } else if (direction === 'south') {
-                    endY = (mapData.height * 2) - 1;
-                    endX = connection ? -connection.xAlignment : startX;
-                    for (let r = 0; r <= 5; r++) {
-                        if (r === 0) {
-                            if (this.player.isWalkable(endX, endY, mapData)) break;
-                        } else {
-                            for (const dx of [-r, r]) {
-                                const testX = endX + dx;
-                                if (testX >= 0 && testX < mapData.width * 2 && this.player.isWalkable(testX, endY, mapData)) {
-                                    endX = testX;
-                                    r = 999;
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                } else if (direction === 'west') {
-                    endX = 0;
-                    endY = connection ? -connection.yAlignment : startY;
-                    for (let r = 0; r <= 5; r++) {
-                        if (r === 0) {
-                            if (this.player.isWalkable(endX, endY, mapData)) break;
-                        } else {
-                            for (const dy of [-r, r]) {
-                                const testY = endY + dy;
-                                if (testY >= 0 && testY < mapData.height * 2 && this.player.isWalkable(endX, testY, mapData)) {
-                                    endY = testY;
-                                    r = 999;
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                } else if (direction === 'east') {
-                    endX = (mapData.width * 2) - 1;
-                    endY = connection ? -connection.yAlignment : startY;
-                    for (let r = 0; r <= 5; r++) {
-                        if (r === 0) {
-                            if (this.player.isWalkable(endX, endY, mapData)) break;
-                        } else {
-                            for (const dy of [-r, r]) {
-                                const testY = endY + dy;
-                                if (testY >= 0 && testY < mapData.height * 2 && this.player.isWalkable(endX, testY, mapData)) {
-                                    endY = testY;
-                                    r = 999;
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            
-            // Find path for this hop
-            const path = this.pathfinding.findPath(startX, startY, endX, endY, mapData);
-            
-            if (path && path.length > 0) {
-                // If this is an intermediate hop (not the last), add one extra step past the boundary
-                // to trigger the boundary crossing event
-                if (i < mapPath.length - 1) {
-                    const direction = hop.direction;
-                    const lastStep = path[path.length - 1];
-                    let extraStep;
-                    
-                    if (direction === 'north') {
-                        extraStep = { x: lastStep.x, y: lastStep.y - 1 }; // Step out of bounds upward
-                    } else if (direction === 'south') {
-                        extraStep = { x: lastStep.x, y: lastStep.y + 1 }; // Step out of bounds downward
-                    } else if (direction === 'west') {
-                        extraStep = { x: lastStep.x - 1, y: lastStep.y }; // Step out of bounds left
-                    } else if (direction === 'east') {
-                        extraStep = { x: lastStep.x + 1, y: lastStep.y }; // Step out of bounds right
-                    }
-                    
-                    path.push(extraStep);
-                    Logger.log(`  📍 Added boundary-crossing step to (${extraStep.x}, ${extraStep.y}) for ${direction} transition`);
-                }
-                
-                // Add this path to the queue
-                mapPathQueue.push({
-                    mapId: hop.mapId,
-                    path: path,
-                    direction: hop.direction
-                });
-                
-                paths[hop.mapId] = path; // Store for rendering
-                Logger.log(`  ✅ Map ${hop.mapId} (${mapData.name}): ${path.length} steps from (${startX},${startY}) to (${endX},${endY})`);
-            } else {
-                Logger.warn(`  ⚠️ No path found for map ${hop.mapId} from (${startX},${startY}) to (${endX},${endY})`);
-            }
-        }
-        
-        this.crossMapPaths = paths; // For rendering visualization
-        this.player.fullMultiMapPath = paths; // Legacy
-        this.player.mapPathQueue = mapPathQueue; // Queue of paths to execute in order
-        this.player.currentQueueIndex = 0; // Track current path in queue
-        
-        // Set the first path as active
-        if (mapPathQueue.length > 0) {
-            const firstPathData = mapPathQueue[0];
-            this.player.setPath(firstPathData.path);
-            Logger.success(`🗺️ Built path queue with ${mapPathQueue.length} map segments, starting with ${firstPathData.path.length} steps on map ${firstPathData.mapId}`);
-        }
-        
-        Logger.success(`🗺️ Cross-map paths built for ${Object.keys(paths).length} maps`);
     }
     
     /**
@@ -1007,31 +581,21 @@ export class MapViewer {
                 if (this.config.isGameMode() && this.player && this.camera) {
                     const transitionTriggered = this.player.update(this.mapState.currentMap, this.preferences);
                     
-                    // Handle transitions
+                    // Handle transitions (boundary crossing or warp)
                     if (transitionTriggered) {
-                        if (transitionTriggered.type === 'warp') {
+                        if (transitionTriggered.type === 'boundary') {
+                            this.handleBoundaryTransition(transitionTriggered);
+                        } else if (transitionTriggered.type === 'warp') {
                             this.handleWarp(transitionTriggered);
-                        } else if (transitionTriggered.type === 'seamless-transition') {
-                            // Player moved to a different map in the seamless world
-                            // Just update the current map reference (no loading needed, all maps are cached)
-                            const newMap = this.mapCache.getMap(transitionTriggered.mapId);
-                            if (newMap) {
-                                Logger.log(`🗺️ Seamless transition to map ${transitionTriggered.mapId}`);
-                                this.mapState.currentMap = newMap;
-                                this.player.currentMapId = transitionTriggered.mapId;
-                            }
                         }
-                        // NOTE: Boundary transitions are disabled in seamless world mode
-                        // Maps are stitched together, so no need to load new maps on boundary crossing
                     }
                     
-                    // Update camera to follow player (using global coordinates in seamless world)
+                    // Update camera to follow player
                     if (this.mapState.currentMap) {
-                        // Use global pixel coordinates if available, otherwise fall back to local
-                        const playerPixelX = this.player.globalPixelX || this.player.state.pixelX;
-                        const playerPixelY = this.player.globalPixelY || this.player.state.pixelY;
-                        
-                        this.camera.focusOnPlayer(playerPixelX, playerPixelY);
+                        this.camera.focusOnPlayer(
+                            this.player.state.pixelX,
+                            this.player.state.pixelY
+                        );
                         this.camera.update();
                     }
                 }
@@ -1058,6 +622,7 @@ export class MapViewer {
     restorePreferences() {
         // Skip preference restoration in game mode
         if (this.config.isGameMode()) {
+
             return;
         }
         
@@ -1101,6 +666,7 @@ export class MapViewer {
                 toggleBtn.classList.add('sidebar-visible');
                 toggleBtn.textContent = '✕';
             }
+
         }
     }
     
@@ -1133,8 +699,12 @@ export class MapViewer {
                 
                 // Save new state
                 this.preferences.savePanelState(panelName, !isCurrentlyCollapsed);
+                
+
             });
         });
+        
+
     }
     
     resizeCanvas() {
@@ -1191,21 +761,25 @@ export class MapViewer {
                 offsetY = -connectedMap.height;
                 // xAlignment = offset * -2, so offset = -xAlignment / 2
                 offsetX = -header.xAlignment / 2;
+                console.log(`[MapViewer] 🧭 NORTH connection: ${connectedMap.name} placed at blocks (${offsetX}, ${offsetY}) [xAlignment: ${header.xAlignment} → offset: ${offsetX}]`);
             } else if (direction === 'south') {
                 // Place connected map below current map
                 offsetY = currentMap.height;
                 // xAlignment = offset * -2, so offset = -xAlignment / 2
                 offsetX = -header.xAlignment / 2;
+                console.log(`[MapViewer] 🧭 SOUTH connection: ${connectedMap.name} placed at blocks (${offsetX}, ${offsetY}) [xAlignment: ${header.xAlignment} → offset: ${offsetX}]`);
             } else if (direction === 'west') {
                 // Place connected map to the left of current map
                 offsetX = -connectedMap.width;
                 // yAlignment = offset * -2, so offset = -yAlignment / 2
                 offsetY = -header.yAlignment / 2;
+                console.log(`[MapViewer] 🧭 WEST connection: ${connectedMap.name} placed at blocks (${offsetX}, ${offsetY}) [yAlignment: ${header.yAlignment} → offset: ${offsetY}]`);
             } else if (direction === 'east') {
                 // Place connected map to the right of current map
                 offsetX = currentMap.width;
                 // yAlignment = offset * -2, so offset = -yAlignment / 2
                 offsetY = -header.yAlignment / 2;
+                console.log(`[MapViewer] 🧭 EAST connection: ${connectedMap.name} placed at blocks (${offsetX}, ${offsetY}) [yAlignment: ${header.yAlignment} → offset: ${offsetY}]`);
             }
             
             result.push({
@@ -1474,311 +1048,6 @@ export class MapViewer {
         }
     }
     
-    /**
-     * Render map tiles at an absolute screen position (for stitched world)
-     * @param {Object} mapData - Map data
-     * @param {number} screenX - Absolute screen X position
-     * @param {number} screenY - Absolute screen Y position
-     * @param {number} scale - Render scale
-     */
-    renderMapTilesAtPosition(mapData, screenX, screenY, scale) {
-        const tilesetImg = this.tilesetManager.getTilesetImage(mapData.tileset);
-        const allBlockDefs = this.tilesetManager.tilesetBlockDefinitions[mapData.tileset];
-        
-        if (!allBlockDefs || !tilesetImg) return;
-        
-        // Calculate visible area
-        const startX = Math.max(0, Math.floor(-screenX / (BLOCK_SIZE * TILE_SIZE * scale)));
-        const startY = Math.max(0, Math.floor(-screenY / (BLOCK_SIZE * TILE_SIZE * scale)));
-        const endX = Math.min(mapData.width - 1, Math.ceil((this.canvas.width - screenX) / (BLOCK_SIZE * TILE_SIZE * scale)));
-        const endY = Math.min(mapData.height - 1, Math.ceil((this.canvas.height - screenY) / (BLOCK_SIZE * TILE_SIZE * scale)));
-        
-        // Skip if not visible
-        if (startX > mapData.width || startY > mapData.height || endX < 0 || endY < 0) {
-            return;
-        }
-        
-        const animationType = this.tilesetManager.getAnimationTypeValue(mapData.tileset);
-        
-        // Render blocks
-        for (let blockY = startY; blockY <= endY; blockY++) {
-            for (let blockX = startX; blockX <= endX; blockX++) {
-                const blockIndex = blockY * mapData.width + blockX;
-                const blockId = mapData.blockData[blockIndex];
-                
-                if (blockId === undefined || !allBlockDefs[blockId]) continue;
-                
-                const blockDef = allBlockDefs[blockId];
-                const screenBlockX = screenX + blockX * BLOCK_SIZE * TILE_SIZE * scale;
-                const screenBlockY = screenY + blockY * BLOCK_SIZE * TILE_SIZE * scale;
-                
-                // Render 4x4 tiles for this block
-                for (let tileY = 0; tileY < BLOCK_SIZE; tileY++) {
-                    for (let tileX = 0; tileX < BLOCK_SIZE; tileX++) {
-                        const tileId = blockDef.tiles[tileY][tileX];
-                        if (tileId === undefined) continue;
-                        
-                        const tileSize = TILE_SIZE * scale;
-                        const tileScreenX = screenBlockX + tileX * tileSize;
-                        const tileScreenY = screenBlockY + tileY * tileSize;
-                        
-                        // Render animated tile if needed
-                        let animatedTileCanvas = null;
-                        if (scale >= 0.5) {
-                            animatedTileCanvas = this.tileAnimator.renderAnimatedTile(
-                                tilesetImg,
-                                tileId,
-                                animationType,
-                                scale
-                            );
-                        }
-                        
-                        if (animatedTileCanvas) {
-                            this.renderer.drawImage(
-                                animatedTileCanvas,
-                                0, 0, animatedTileCanvas.width, animatedTileCanvas.height,
-                                tileScreenX, tileScreenY, tileSize, tileSize
-                            );
-                        } else {
-                            const srcX = (tileId % 16) * TILE_SIZE;
-                            const srcY = Math.floor(tileId / 16) * TILE_SIZE;
-                            
-                            this.renderer.drawImage(
-                                tilesetImg,
-                                srcX, srcY, TILE_SIZE, TILE_SIZE,
-                                tileScreenX, tileScreenY, tileSize, tileSize
-                            );
-                        }
-                        
-                        // Render collision debug overlay if enabled
-                        if (this.showCollisionDebug) {
-                            // Analyze tile collision type using TilesetManager
-                            const isPassable = this.tilesetManager.isTilePassable(mapData.tileset, tileId);
-                            const isGrass = this.tilesetManager.isGrassTile(mapData.tileset, tileId);
-                            const isWater = this.tilesetManager.isWaterTile(tileId);
-                            const isLedge = this.tilesetManager.isLedgeTile(tileId);
-                            const isFlower = this.tilesetManager.isFlowerTile(mapData.tileset, tileId);
-                            const isDoor = this.tilesetManager.isDoorTile(tileId);
-                            const isWarpCarpet = this.tilesetManager.isWarpCarpetTile(tileId);
-                            const isCounter = this.tilesetManager.isCounterTile(tileId);
-                            
-                            // Determine collision overlay color (same priority as map-viewer mode)
-                            let overlayColor = null;
-                            let overlayAlpha = 0.3;
-                            
-                            if (isGrass) {
-                                overlayColor = 'rgba(0, 255, 0, 1.0)';
-                                overlayAlpha = 0.4;
-                            } else if (isWater) {
-                                overlayColor = 'rgba(0, 100, 255, 1.0)';
-                                overlayAlpha = 0.35;
-                            } else if (isLedge) {
-                                overlayColor = 'rgba(255, 140, 0, 1.0)';
-                                overlayAlpha = 0.4;
-                            } else if (isWarpCarpet) {
-                                overlayColor = 'rgba(255, 0, 255, 1.0)';
-                                overlayAlpha = 0.35;
-                            } else if (isDoor) {
-                                overlayColor = 'rgba(128, 0, 255, 1.0)';
-                                overlayAlpha = 0.4;
-                            } else if (isCounter) {
-                                overlayColor = 'rgba(255, 255, 0, 1.0)';
-                                overlayAlpha = 0.35;
-                            } else if (isFlower) {
-                                overlayColor = 'rgba(0, 255, 255, 1.0)';
-                                overlayAlpha = 0.25;
-                            } else if (isPassable) {
-                                overlayColor = 'rgba(100, 255, 100, 1.0)';
-                                overlayAlpha = 0.2;
-                            } else {
-                                overlayColor = 'rgba(255, 0, 0, 1.0)';
-                                overlayAlpha = 0.3;
-                            }
-                            
-                            // Draw collision overlay
-                            if (overlayColor) {
-                                this.renderer.setAlpha(overlayAlpha);
-                                this.renderer.drawRect(tileScreenX, tileScreenY, tileSize, tileSize, overlayColor, true);
-                                this.renderer.resetAlpha();
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-    
-    /**
-     * Render sprites at an absolute screen position (for stitched world)
-     * @param {Object} mapData - Map data
-     * @param {number} screenX - Absolute screen X position
-     * @param {number} screenY - Absolute screen Y position
-     * @param {number} scale - Render scale
-     */
-    renderSpritesAtPosition(mapData, screenX, screenY, scale) {
-        if (!mapData.objects || !mapData.objects.sprites || !mapData.objects.sprites.data) {
-            return;
-        }
-        
-        // Debug first sprite only once
-        if (mapData.objects.sprites.data.length > 0 && !this._debuggedSprite) {
-            this._debuggedSprite = true;
-            const sprite = mapData.objects.sprites.data[0];
-            console.log('🐛 Sprite Debug:', {
-                'sprite.x (blocks)': sprite.x,
-                'sprite.y (blocks)': sprite.y,
-                'screenX': screenX,
-                'screenY': screenY,
-                'scale': scale,
-                'mapName': mapData.name || mapData.mapName
-            });
-        }
-        
-        for (const sprite of mapData.objects.sprites.data) {
-            // ROM uses 1-based sprite IDs (1-72), our files use 0-based (0-71)
-            const spriteFileId = sprite.pictureId - 1;
-            
-            // Skip invalid sprite IDs (like 255 = unused/disabled sprites)
-            if (spriteFileId > 71 || spriteFileId < 0) {
-                continue;
-            }
-            
-            const spriteImg = this.spriteManager.getSpriteImage(spriteFileId);
-            if (!spriteImg || !spriteImg.complete || spriteImg.naturalWidth === 0) {
-                // Try to load the sprite asynchronously
-                this.spriteManager.loadSprite(spriteFileId);
-                continue;
-            }
-            
-            // sprite.x and sprite.y are in PLAYER UNITS (2×2 tiles = 16×16 pixels)
-            // This is the same coordinate system as player movement
-            const spritePixelX = sprite.x * 16; // Each player unit is 2×2 tiles = 16 pixels
-            const spritePixelY = sprite.y * 16;
-            
-            // Debug calculation for first sprite
-            if (!this._debuggedCalc && sprite === mapData.objects.sprites.data[0]) {
-                this._debuggedCalc = true;
-                const x_calc = screenX + (spritePixelX * scale);
-                const y_calc = screenY + (spritePixelY * scale);
-                console.log('🔧 Sprite Position Calculation (PLAYER UNITS):', {
-                    'sprite.x (player units)': sprite.x,
-                    'sprite.y (player units)': sprite.y,
-                    'spritePixelX': spritePixelX,
-                    'spritePixelY': spritePixelY,
-                    'screenX': screenX,
-                    'screenY': screenY,
-                    'scale': scale,
-                    'calculation': `${screenX} + (${spritePixelX} * ${scale}) = ${x_calc}`,
-                    'final x': x_calc,
-                    'final y': y_calc
-                });
-            }
-            
-            const size = 16 * scale; // Sprites are 16×16 pixels (2×2 tiles)
-            // screenX/screenY is the map's top-left corner in screen space (already scaled)
-            // Add the sprite's pixel offset (also scaled) to get final position
-            const x = screenX + (spritePixelX * scale);
-            const y = screenY + (spritePixelY * scale);
-            
-            // Get facing direction and frame info
-            const frameInfo = this.getSpriteFrame(sprite, null, 0, false);
-            
-            // Save context for potential mirroring
-            this.renderer.save();
-            
-            // Apply horizontal flip for right-facing sprites
-            if (frameInfo.mirror) {
-                this.renderer.translate(x + size, y);
-                this.renderer.scale(-1, 1);
-                this.renderer.drawImage(
-                    spriteImg,
-                    frameInfo.frameX, frameInfo.frameY, 16, 16,  // Source frame (x, y, width, height)
-                    0, 0, size, size              // Draw at 0,0 due to transform
-                );
-            } else {
-                // Draw normally
-                this.renderer.drawImage(
-                    spriteImg,
-                    frameInfo.frameX, frameInfo.frameY, 16, 16,  // Source frame (x, y, width, height)
-                    x, y, size, size
-                );
-            }
-            
-            this.renderer.restore();
-        }
-    }
-    
-    /**
-     * Render walking path in global coordinates
-     * @param {Array} path - Path array
-     * @param {number} pathIndex - Current index in path
-     * @param {number} offsetX - Camera offset X
-     * @param {number} offsetY - Camera offset Y
-     * @param {number} scale - Render scale
-     */
-    renderWalkingPathGlobal(path, pathIndex, offsetX, offsetY, scale) {
-        // Convert local path to global coordinates and render
-        // For now, use existing method (TODO: implement global path rendering)
-        this.renderWalkingPath(path, pathIndex, offsetX, offsetY, scale);
-    }
-    
-    /**
-     * Render hover tile in global coordinates
-     * @param {Object} tile - Tile data {x, y}
-     * @param {number} offsetX - Camera offset X
-     * @param {number} offsetY - Camera offset Y
-     * @param {number} scale - Render scale
-     */
-    renderHoverTileGlobal(tile, offsetX, offsetY, scale) {
-        // Convert local tile to global coordinates and render
-        // For now, use existing method (TODO: implement global tile rendering)
-        this.renderHoverTile(tile, offsetX, offsetY, scale);
-    }
-    
-    /**
-     * Render collision debug legend (collision overlay is rendered in renderMapTilesAtPosition)
-     * @param {Object} playerGlobalPos - Player's global position {x, y}
-     * @param {Object} cameraOffset - Camera offset {offsetX, offsetY}
-     * @param {number} scale - Render scale
-     * @param {Array} visibleMaps - Array of visible maps with their positions
-     */
-    renderCollisionDebugGlobal(playerGlobalPos, cameraOffset, scale, visibleMaps) {
-        // The actual collision overlay is rendered in renderMapTilesAtPosition()
-        // This method only renders the legend
-        
-        // Draw comprehensive legend in top-right corner
-        this.ctx.save();
-        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
-        this.ctx.fillRect(this.canvas.width - 200, 5, 195, 215);
-        
-        this.ctx.font = 'bold 13px monospace';
-        this.ctx.fillStyle = 'white';
-        this.ctx.textAlign = 'left';
-        this.ctx.fillText('Collision Debug (I)', this.canvas.width - 195, 23);
-        
-        const legendItems = [
-            { color: 'rgba(0, 255, 0, 0.6)', label: 'Grass (Encounters)', y: 45 },
-            { color: 'rgba(0, 100, 255, 0.6)', label: 'Water (Surfable)', y: 65 },
-            { color: 'rgba(255, 140, 0, 0.6)', label: 'Ledge (Jump)', y: 85 },
-            { color: 'rgba(255, 0, 255, 0.6)', label: 'Warp Carpet', y: 105 },
-            { color: 'rgba(128, 0, 255, 0.6)', label: 'Door', y: 125 },
-            { color: 'rgba(255, 255, 0, 0.6)', label: 'Counter', y: 145 },
-            { color: 'rgba(0, 255, 255, 0.6)', label: 'Flower/Decor', y: 165 },
-            { color: 'rgba(100, 255, 100, 0.6)', label: 'Walkable', y: 185 },
-            { color: 'rgba(255, 0, 0, 0.6)', label: 'Blocked', y: 205 }
-        ];
-        
-        this.ctx.font = '11px monospace';
-        for (const item of legendItems) {
-            this.ctx.fillStyle = item.color;
-            this.ctx.fillRect(this.canvas.width - 195, item.y - 10, 16, 16);
-            this.ctx.fillStyle = 'white';
-            this.ctx.fillText(item.label, this.canvas.width - 173, item.y);
-        }
-        
-        this.ctx.restore();
-    }
-    
     // This will be continued in the next part...
     async render() {
         // Prevent concurrent render calls
@@ -1853,76 +1122,6 @@ export class MapViewer {
                 }
             }
             
-            // GAME MODE: Use seamless stitched world rendering
-            if (this.config.isGameMode() && this.mapCache && this.mapCache.isReady() && this.player) {
-                // Get player's global position
-                const playerGlobalPos = this.mapCache.localToGlobal(
-                    this.player.currentMapId,
-                    this.player.state.x,
-                    this.player.state.y
-                );
-                
-                if (playerGlobalPos) {
-                    // Get all visible maps based on viewport
-                    const visibleMaps = this.mapCache.getVisibleMaps(
-                        playerGlobalPos.x,
-                        playerGlobalPos.y,
-                        this.canvas.width,
-                        this.canvas.height,
-                        scale
-                    );
-                    
-                    // Render all visible maps in the stitched world
-                    for (const { mapId, globalX, globalY, map } of visibleMaps) {
-                        if (!map || !this.tilesetManager.hasTileset(map.tileset)) continue;
-                        
-                        // Calculate rendering offset for this map in global space
-                        // Convert global player units to pixels
-                        const mapGlobalPixelX = globalX * 16; // 16 pixels per player unit
-                        const mapGlobalPixelY = globalY * 16;
-                        
-                        // Calculate screen position based on camera offset
-                        const mapScreenX = offset.x + (mapGlobalPixelX * scale);
-                        const mapScreenY = offset.y + (mapGlobalPixelY * scale);
-                        
-                        // Render this map
-                        this.renderMapTilesAtPosition(map, mapScreenX, mapScreenY, scale);
-                        
-                        // Render sprites for this map
-                        this.renderSpritesAtPosition(map, mapScreenX, mapScreenY, scale);
-                    }
-                    
-                    // Render player
-                    if (this.player && this.camera) {
-                        const cameraOffset = this.camera.getOffset();
-                        
-                        // Render walking path (before player so it's under the player sprite)
-                        if (this.player.isFollowingPath()) {
-                            this.renderWalkingPathGlobal(this.player.currentPath, this.player.pathIndex, cameraOffset.offsetX, cameraOffset.offsetY, scale);
-                        }
-                        
-                        this.player.render(this.ctx, cameraOffset.offsetX, cameraOffset.offsetY, scale);
-                        
-                        // Render hover tile indicator (destination tile)
-                        if (this.mouseHoverTile) {
-                            this.renderHoverTileGlobal(this.mouseHoverTile, cameraOffset.offsetX, cameraOffset.offsetY, scale);
-                        }
-                        
-                        // Render collision debug overlay if enabled
-                        if (this.showCollisionDebug) {
-                            this.renderCollisionDebugGlobal(playerGlobalPos, cameraOffset, scale, visibleMaps);
-                        }
-                    }
-                    
-                    // Update game mode footer
-                    this.updateGameFooter();
-                    
-                    this.isRendering = false;
-                    return;
-                }
-            }
-            
-            // MAP-VIEWER MODE: Original rendering logic
             // Normal rendering mode
             // For interior maps (no border connections), render only the current map
             // For outdoor maps (with border connections), render with connected maps
@@ -1983,12 +1182,6 @@ export class MapViewer {
             // Render walking path (before player so it's under the player sprite)
             if (this.player.isFollowingPath()) {
                 this.renderWalkingPath(this.player.currentPath, this.player.pathIndex, cameraOffset.offsetX, cameraOffset.offsetY, scale);
-            }
-            
-            // Render cross-map paths if available (use player's stored paths for consistency)
-            if (this.player.fullMultiMapPath || this.crossMapPaths) {
-                const pathsToRender = this.player.fullMultiMapPath || this.crossMapPaths;
-                this.renderCrossMapPaths(cameraOffset.offsetX, cameraOffset.offsetY, scale, pathsToRender);
             }
             
             this.player.render(this.ctx, cameraOffset.offsetX, cameraOffset.offsetY, scale);
@@ -2202,21 +1395,20 @@ export class MapViewer {
         const currentMap = this.mapState.getCurrentMap();
         if (!currentMap) return;
         
-        // Player units are 16 pixels (each player unit = 2x2 tiles of 8px each)
+        // Player units are 16 pixels
         const tileSize = 16;
         
-        // Calculate screen position for the player's TOP-LEFT position
+        // Calculate screen position
         const screenX = hoverTile.x * tileSize * scale + offsetX;
         const screenY = hoverTile.y * tileSize * scale + offsetY;
         const size = tileSize * scale;
         
         // Check if tile is walkable to determine color
-        // hoverTile contains GLOBAL coordinates in seamless world
-        const isWalkable = this.player.isWalkable(hoverTile.x, hoverTile.y, currentMap, true); // true = use global coords
+        const isWalkable = this.player.isWalkable(hoverTile.x, hoverTile.y, currentMap);
         const borderColor = isWalkable ? 'rgba(100, 200, 255, 0.8)' : 'rgba(255, 100, 100, 0.8)';
         const fillColor = isWalkable ? 'rgba(100, 200, 255, 0.15)' : 'rgba(255, 100, 100, 0.15)';
         
-        // Draw semi-transparent fill for main tile
+        // Draw semi-transparent fill
         this.renderer.drawRect(screenX, screenY, size, size, fillColor, true);
         
         // Draw border (slightly thicker for visibility)
@@ -2226,27 +1418,6 @@ export class MapViewer {
         this.ctx.lineWidth = borderWidth;
         this.ctx.strokeRect(screenX, screenY, size, size);
         this.ctx.restore();
-        
-        // Also highlight the bottom row (where player's feet will be) at 50% opacity
-        // This shows which tiles are actually being checked for collision
-        if (scale >= 2) { // Only show at higher zoom levels for clarity
-            this.ctx.save();
-            this.ctx.globalAlpha = 0.5;
-            
-            // Draw subtle indicators for the bottom two tiles (player's feet)
-            const footTileSize = 8 * scale; // 8px tiles
-            const footY = screenY + size; // One player unit below
-            
-            // Left foot tile
-            this.ctx.strokeStyle = borderColor;
-            this.ctx.lineWidth = Math.max(1, borderWidth * 0.6);
-            this.ctx.strokeRect(screenX, footY, footTileSize, footTileSize);
-            
-            // Right foot tile
-            this.ctx.strokeRect(screenX + footTileSize, footY, footTileSize, footTileSize);
-            
-            this.ctx.restore();
-        }
     }
     
     /**
@@ -2300,123 +1471,6 @@ export class MapViewer {
                 this.ctx.stroke();
                 this.ctx.restore();
             }
-        }
-    }
-    
-    /**
-     * Render cross-map path visualization
-     * Shows paths across multiple connected maps
-     * @param {number} offsetX - Camera X offset
-     * @param {number} offsetY - Camera Y offset
-     * @param {number} scale - Current zoom scale
-     * @param {Object} paths - Path data object with map IDs as keys
-     */
-    renderCrossMapPaths(offsetX, offsetY, scale, paths) {
-        if (!paths || !this.mapState.currentMap) return;
-        
-        const currentMapId = this.mapState.currentMap.mapId;
-        const tileSize = 16; // Player units are 16 pixels
-        
-        // Colors for different map segments
-        const currentMapColor = 'rgba(100, 200, 255, 0.5)'; // Cyan for current map
-        const nextMapColor = 'rgba(255, 200, 100, 0.3)'; // Orange for connected maps
-        
-        // Render path for current map
-        if (paths[currentMapId]) {
-            const path = paths[currentMapId];
-            this.renderPathSegment(path, offsetX, offsetY, scale, currentMapColor, tileSize);
-        }
-        
-        // Render paths for connected maps (visualized across boundaries)
-        const currentMap = this.mapState.currentMap;
-        if (currentMap.connections && currentMap.connectionHeaders) {
-            // North connection
-            if (currentMap.connections.north && paths[currentMap.connections.north]) {
-                const connection = currentMap.connectionHeaders.north;
-                const connectedMapId = connection.connectedMap;
-                const connectedMap = this.mapCache.getMap(connectedMapId);
-                
-                if (connectedMap && paths[connectedMapId]) {
-                    const path = paths[connectedMapId];
-                    const mapOffsetX = -connection.xAlignment * 8; // Convert alignment to pixels
-                    const mapOffsetY = -connectedMap.heightPixels; // Connected map is above
-                    this.renderPathSegment(path, offsetX + mapOffsetX, offsetY + mapOffsetY, scale, nextMapColor, tileSize);
-                }
-            }
-            
-            // South connection
-            if (currentMap.connections.south && paths[currentMap.connections.south]) {
-                const connection = currentMap.connectionHeaders.south;
-                const connectedMapId = connection.connectedMap;
-                const connectedMap = this.mapCache.getMap(connectedMapId);
-                
-                if (connectedMap && paths[connectedMapId]) {
-                    const path = paths[connectedMapId];
-                    const mapOffsetX = -connection.xAlignment * 8;
-                    const mapOffsetY = currentMap.heightPixels; // Connected map is below
-                    this.renderPathSegment(path, offsetX + mapOffsetX, offsetY + mapOffsetY, scale, nextMapColor, tileSize);
-                }
-            }
-            
-            // West connection
-            if (currentMap.connections.west && paths[currentMap.connections.west]) {
-                const connection = currentMap.connectionHeaders.west;
-                const connectedMapId = connection.connectedMap;
-                const connectedMap = this.mapCache.getMap(connectedMapId);
-                
-                if (connectedMap && paths[connectedMapId]) {
-                    const path = paths[connectedMapId];
-                    const mapOffsetX = -connectedMap.widthPixels; // Connected map is to the left
-                    const mapOffsetY = -connection.yAlignment * 8;
-                    this.renderPathSegment(path, offsetX + mapOffsetX, offsetY + mapOffsetY, scale, nextMapColor, tileSize);
-                }
-            }
-            
-            // East connection
-            if (currentMap.connections.east && paths[currentMap.connections.east]) {
-                const connection = currentMap.connectionHeaders.east;
-                const connectedMapId = connection.connectedMap;
-                const connectedMap = this.mapCache.getMap(connectedMapId);
-                
-                if (connectedMap && paths[connectedMapId]) {
-                    const path = paths[connectedMapId];
-                    const mapOffsetX = currentMap.widthPixels; // Connected map is to the right
-                    const mapOffsetY = -connection.yAlignment * 8;
-                    this.renderPathSegment(path, offsetX + mapOffsetX, offsetY + mapOffsetY, scale, nextMapColor, tileSize);
-                }
-            }
-        }
-    }
-    
-    /**
-     * Helper method to render a path segment
-     * @param {Array} path - Array of {x, y} positions
-     * @param {number} offsetX - X offset for rendering
-     * @param {number} offsetY - Y offset for rendering
-     * @param {number} scale - Zoom scale
-     * @param {string} color - Path color
-     * @param {number} tileSize - Size of one tile in pixels
-     */
-    renderPathSegment(path, offsetX, offsetY, scale, color, tileSize) {
-        if (!path || path.length === 0) return;
-        
-        for (let i = 0; i < path.length; i++) {
-            const step = path[i];
-            const screenX = step.x * tileSize * scale + offsetX;
-            const screenY = step.y * tileSize * scale + offsetY;
-            const size = tileSize * scale;
-            
-            // Draw dot in center of tile
-            const centerX = screenX + size / 2;
-            const centerY = screenY + size / 2;
-            const dotRadius = Math.max(2, scale * 1.5); // Slightly smaller than main path
-            
-            this.ctx.save();
-            this.ctx.fillStyle = color;
-            this.ctx.beginPath();
-            this.ctx.arc(centerX, centerY, dotRadius, 0, Math.PI * 2);
-            this.ctx.fill();
-            this.ctx.restore();
         }
     }
     
@@ -2937,14 +1991,6 @@ export class MapViewer {
                 this.toggleOverlays();
             } else if (e.key === 'c') {
                 this.toggleCoordLabels();
-            } else if (e.key === 'i' || e.key === 'I') {
-                // Toggle collision debug overlay (game mode only)
-                if (this.config.isGameMode()) {
-                    this.showCollisionDebug = !this.showCollisionDebug;
-                    this.preferences.saveGameCollisionDebug(this.showCollisionDebug);
-                    console.log(`[MapViewer] Collision debug overlay: ${this.showCollisionDebug ? 'ON' : 'OFF'}`);
-                    this.render();
-                }
             }
         });
     }
@@ -3141,17 +2187,30 @@ export class MapViewer {
         const playerX = Math.floor(worldPixelX / 16);
         const playerY = Math.floor(worldPixelY / 16);
         
-        // SEAMLESS WORLD: In global coordinates, always allow hover
-        // The isWalkable check will handle validation across maps
-        // Update hover tile
-        if (!this.mouseHoverTile || this.mouseHoverTile.x !== playerX || this.mouseHoverTile.y !== playerY) {
-            this.mouseHoverTile = { x: playerX, y: playerY };
-            this.render(); // Re-render to show hover highlight
-        }
+        // Check if within map bounds
+        const mapWidthPlayerUnits = currentMap.width * 2;
+        const mapHeightPlayerUnits = currentMap.height * 2;
         
-        // Check if hovering over walkable tile (playerX/playerY are GLOBAL coordinates in seamless world)
-        const isWalkable = this.player.isWalkable(playerX, playerY, currentMap, true); // true = use global coords
-        this.canvas.style.cursor = isWalkable ? 'pointer' : 'not-allowed';
+        if (playerX >= 0 && playerX < mapWidthPlayerUnits && 
+            playerY >= 0 && playerY < mapHeightPlayerUnits) {
+            
+            // Update hover tile
+            if (!this.mouseHoverTile || this.mouseHoverTile.x !== playerX || this.mouseHoverTile.y !== playerY) {
+                this.mouseHoverTile = { x: playerX, y: playerY };
+                this.render(); // Re-render to show hover highlight
+            }
+            
+            // Check if hovering over walkable tile
+            const isWalkable = this.player.isWalkable(playerX, playerY, currentMap);
+            this.canvas.style.cursor = isWalkable ? 'pointer' : 'not-allowed';
+        } else {
+            // Outside map bounds
+            if (this.mouseHoverTile) {
+                this.mouseHoverTile = null;
+                this.render();
+            }
+            this.canvas.style.cursor = 'default';
+        }
     }
     
     /**
@@ -3170,33 +2229,39 @@ export class MapViewer {
         const worldPixelX = (canvasX - this.camera.offsetX) / this.camera.zoom;
         const worldPixelY = (canvasY - this.camera.offsetY) / this.camera.zoom;
         
-        // Convert to player units (16-pixel tiles) - these are GLOBAL coordinates
+        // Convert to player units (16-pixel tiles)
         const targetX = Math.floor(worldPixelX / 16);
         const targetY = Math.floor(worldPixelY / 16);
         
-        // Get current player global position
-        const startX = this.player.getGlobalX();
-        const startY = this.player.getGlobalY();
+        // Check if within map bounds
+        const mapWidthPlayerUnits = currentMap.width * 2;
+        const mapHeightPlayerUnits = currentMap.height * 2;
         
-        console.log(`[MapViewer.Click] Target: (${targetX}, ${targetY}) Global | Start: (${startX}, ${startY}) Global`);
+        if (targetX < 0 || targetX >= mapWidthPlayerUnits || 
+            targetY < 0 || targetY >= mapHeightPlayerUnits) {
+            console.log(`[Game Mode] Click outside map bounds: (${targetX}, ${targetY})`);
+            return;
+        }
+        
+        // Get current player position
+        const startX = this.player.state.x;
+        const startY = this.player.state.y;
         
         // Check if clicking on current position
         if (startX === targetX && startY === targetY) {
+
             return;
         }
         
-        // Check if target is walkable using GLOBAL coordinates
-        if (!this.player.isWalkable(targetX, targetY, currentMap, true)) {
-            return;
-        }
-        
-        // Find path using A* pathfinding with GLOBAL coordinates
-        // This will work across map boundaries automatically
-        const path = this.pathfinding.findPath(startX, startY, targetX, targetY, currentMap, true);
+        // Find path using A* pathfinding
+        console.log(`[Game Mode] Finding path from (${startX}, ${startY}) to (${targetX}, ${targetY})...`);
+        const path = this.pathfinding.findPath(startX, startY, targetX, targetY, currentMap);
         
         if (path) {
-            // Path coordinates are in GLOBAL space, player will handle conversion
-            this.player.setPath(path, true); // true = path is in global coordinates
+
+            this.player.setPath(path);
+        } else {
+            console.log(`[Game Mode] No path found to (${targetX}, ${targetY})`);
         }
     }
     
@@ -3245,146 +2310,38 @@ export class MapViewer {
         // ROM object coords are in 2-TILE units
         const romX = Math.floor(tileX / 2);
         const romY = Math.floor(tileY / 2);
+        
+        Logger.log(`Clicked at tile (${tileX}, ${tileY}) = ROM coords (${romX}, ${romY})`);
+        
         // Check boundary connections first (only in normal mode, not interior layout)
         if (!this.showingInteriorLayout) {
             const mapWidthTiles = currentMap.width * BLOCK_SIZE;
             const mapHeightTiles = currentMap.height * BLOCK_SIZE;
             
-            // Check if click is outside map bounds and has connection
             if (currentMap.connections && currentMap.connectionHeaders) {
-                let targetMapId = null;
-                let targetTileX = tileX;
-                let targetTileY = tileY;
+                const boundaryThreshold = 1;
                 
-                if (currentMap.connections.north && tileY < 0) {
-                    // Clicked above map - convert to connected map coordinates
-                    const connection = currentMap.connectionHeaders.north;
-                    const newMap = this.mapCache.getMap(connection.connectedMap);
-                    if (newMap) {
-                        const mapOffsetX = -connection.xAlignment / 2; // In blocks
-                        const mapOffsetXTiles = mapOffsetX * BLOCK_SIZE;
-                        targetMapId = connection.connectedMap;
-                        targetTileX = tileX - mapOffsetXTiles;
-                        targetTileY = (newMap.height * BLOCK_SIZE) + tileY;
-                    }
-                } else if (currentMap.connections.south && tileY >= mapHeightTiles) {
-                    // Clicked below map
-                    const connection = currentMap.connectionHeaders.south;
-                    const newMap = this.mapCache.getMap(connection.connectedMap);
-                    if (newMap) {
-                        const mapOffsetX = -connection.xAlignment / 2;
-                        const mapOffsetXTiles = mapOffsetX * BLOCK_SIZE;
-                        targetMapId = connection.connectedMap;
-                        targetTileX = tileX - mapOffsetXTiles;
-                        targetTileY = tileY - mapHeightTiles;
-                    }
-                } else if (currentMap.connections.west && tileX < 0) {
-                    // Clicked left of map
-                    const connection = currentMap.connectionHeaders.west;
-                    const newMap = this.mapCache.getMap(connection.connectedMap);
-                    if (newMap) {
-                        const mapOffsetY = -connection.yAlignment / 2;
-                        const mapOffsetYTiles = mapOffsetY * BLOCK_SIZE;
-                        targetMapId = connection.connectedMap;
-                        targetTileX = (newMap.width * BLOCK_SIZE) + tileX;
-                        targetTileY = tileY - mapOffsetYTiles;
-                    }
-                } else if (currentMap.connections.east && tileX >= mapWidthTiles) {
-                    // Clicked right of map
-                    const connection = currentMap.connectionHeaders.east;
-                    const newMap = this.mapCache.getMap(connection.connectedMap);
-                    if (newMap) {
-                        const mapOffsetY = -connection.yAlignment / 2;
-                        const mapOffsetYTiles = mapOffsetY * BLOCK_SIZE;
-                        targetMapId = connection.connectedMap;
-                        targetTileX = tileX - mapWidthTiles;
-                        targetTileY = tileY - mapOffsetYTiles;
-                    }
+                if (currentMap.connections.north && tileY >= 0 && tileY < boundaryThreshold) {
+
+                    this.loadMap(currentMap.connectionHeaders.north.connectedMap);
+                    return;
                 }
                 
-                // If we found a target in a connected map, pathfind there
-                if (targetMapId !== null) {
-                    Logger.info(`🖱️ Click on connected map ${targetMapId} at tile (${targetTileX}, ${targetTileY})`);
-                    
-                    // Find path from current map to target map
-                    const mapPath = this.mapCache.findMapPath(currentMap.mapId, targetMapId);
-                    if (mapPath && mapPath.length > 0) {
-                        // Set up multi-hop navigation
-                        this.player.navigationRoute = mapPath;
-                        
-                        // Convert tile coords to player units (2x)
-                        const targetPlayerX = targetTileX * 2;
-                        const targetPlayerY = targetTileY * 2;
-                        
-                        // Store final destination
-                        this.player.finalDestination = { mapId: targetMapId, x: targetPlayerX, y: targetPlayerY };
-                        
-                        // Build cross-map path visualization
-                        this.buildCrossMapPaths(mapPath);
-                        
-                        // Navigate to first boundary
-                        const firstHop = mapPath[1];
-                        const direction = firstHop.direction;
-                        const playerX = this.player.state.x;
-                        const playerY = this.player.state.y;
-                        let boundaryX, boundaryY;
-                        
-                        if (direction === 'north') {
-                            boundaryY = 0;
-                            boundaryX = playerX;
-                            for (let searchRadius = 0; searchRadius <= 10; searchRadius++) {
-                                const positions = searchRadius === 0 ? [playerX] : [playerX - searchRadius, playerX + searchRadius];
-                                for (const testX of positions) {
-                                    if (testX >= 0 && testX < currentMap.width * 2 && this.player.isWalkable(testX, boundaryY, currentMap)) {
-                                        boundaryX = testX;
-                                        break;
-                                    }
-                                }
-                            }
-                        } else if (direction === 'south') {
-                            boundaryY = (currentMap.height * 2) - 1;
-                            boundaryX = playerX;
-                            for (let searchRadius = 0; searchRadius <= 10; searchRadius++) {
-                                const positions = searchRadius === 0 ? [playerX] : [playerX - searchRadius, playerX + searchRadius];
-                                for (const testX of positions) {
-                                    if (testX >= 0 && testX < currentMap.width * 2 && this.player.isWalkable(testX, boundaryY, currentMap)) {
-                                        boundaryX = testX;
-                                        break;
-                                    }
-                                }
-                            }
-                        } else if (direction === 'west') {
-                            boundaryX = 0;
-                            boundaryY = playerY;
-                            for (let searchRadius = 0; searchRadius <= 10; searchRadius++) {
-                                const positions = searchRadius === 0 ? [playerY] : [playerY - searchRadius, playerY + searchRadius];
-                                for (const testY of positions) {
-                                    if (testY >= 0 && testY < currentMap.height * 2 && this.player.isWalkable(boundaryX, testY, currentMap)) {
-                                        boundaryY = testY;
-                                        break;
-                                    }
-                                }
-                            }
-                        } else if (direction === 'east') {
-                            boundaryX = (currentMap.width * 2) - 1;
-                            boundaryY = playerY;
-                            for (let searchRadius = 0; searchRadius <= 10; searchRadius++) {
-                                const positions = searchRadius === 0 ? [playerY] : [playerY - searchRadius, playerY + searchRadius];
-                                for (const testY of positions) {
-                                    if (testY >= 0 && testY < currentMap.height * 2 && this.player.isWalkable(boundaryX, testY, currentMap)) {
-                                        boundaryY = testY;
-                                        break;
-                                    }
-                                }
-                            }
-                        }
-                        
-                        const path = this.pathfinding.findPath(playerX, playerY, boundaryX, boundaryY, currentMap);
-                        if (path && path.length > 0) {
-                            // buildCrossMapPaths already set the path from queue
-                            Logger.success(`✅ Path queue activated for click navigation to map ${targetMapId}`);
-                        }
-                    }
+                if (currentMap.connections.south && tileY >= mapHeightTiles - boundaryThreshold) {
+
+                    this.loadMap(currentMap.connectionHeaders.south.connectedMap);
+                    return;
+                }
+                
+                if (currentMap.connections.west && tileX >= 0 && tileX < boundaryThreshold) {
+
+                    this.loadMap(currentMap.connectionHeaders.west.connectedMap);
+                    return;
+                }
+                
+                if (currentMap.connections.east && tileX >= mapWidthTiles - boundaryThreshold) {
+
+                    this.loadMap(currentMap.connectionHeaders.east.connectedMap);
                     return;
                 }
             }
@@ -3397,10 +2354,14 @@ export class MapViewer {
             );
             
             if (clickedWarp) {
+
+                
                 if (clickedWarp.mapId === 255) {
                     // Return to source overworld map - find it dynamically
+
                     const sourceMap = await this.mapDataManager.findSourceOverworldMap(currentMap.mapId);
                     if (sourceMap) {
+                        Logger.log(`Returning to map ${sourceMap.mapId} at (${sourceMap.x}, ${sourceMap.y})`);
                         this.loadMap(sourceMap.mapId);
                     } else {
                         Logger.warn('No source overworld map found, defaulting to Pallet Town');
@@ -3412,6 +2373,8 @@ export class MapViewer {
                         await this.loadMap(clickedWarp.mapId, { suppressErrorUI: true });
                     } catch (error) {
                         // Silently handle the error - this is expected for broken maps like elevators
+
+                        
                         // Get preferred source map from localStorage
                         const preferredMapId = this.preferences.loadPreviousMap();
                         
@@ -3422,6 +2385,7 @@ export class MapViewer {
                         );
                         
                         if (sourceMap) {
+                            Logger.log(`Returning to source map ${sourceMap.mapId} (${sourceMap.mapName})`);
                             this.loadMap(sourceMap.mapId);
                         } else {
                             Logger.warn('No source map found, defaulting to Pallet Town');
@@ -3440,6 +2404,7 @@ export class MapViewer {
             );
             
             if (clickedSprite) {
+
                 this.showSpriteModal(clickedSprite, romX, romY);
                 return;
             }
@@ -3452,6 +2417,7 @@ export class MapViewer {
             );
             
             if (clickedSign) {
+
                 this.showSignModal(clickedSign, romX, romY);
                 return;
             }
@@ -4283,8 +3249,10 @@ ${sign.scriptText.hexString}
             npcMovementCheckbox.addEventListener('change', (e) => {
                 this.movementEnabled = e.target.checked;
                 if (this.movementEnabled) {
+
                     this.movementEngine.start();
                 } else {
+
                     this.movementEngine.stop();
                     this.movementEngine.resetAllSprites();
                     this.render(); // Re-render with static positions
@@ -4299,6 +3267,8 @@ ${sign.scriptText.hexString}
             tileOptimizationCheckbox.addEventListener('change', (e) => {
                 this.tileOptimizationEnabled = e.target.checked;
                 this.preferences.saveTileOptimization(this.tileOptimizationEnabled);
+
+                
                 // Sync with interior renderer
                 if (this.interiorRenderer) {
                     this.interiorRenderer.setTileOptimization(this.tileOptimizationEnabled);
@@ -4395,13 +3365,7 @@ ${sign.scriptText.hexString}
     
     toggleOverlays() {
         this.showOverlays = !this.showOverlays;
-        
-        // Save to appropriate storage based on mode
-        if (this.config.isGameMode()) {
-            this.preferences.saveGameShowOverlays(this.showOverlays);
-        } else {
-            this.preferences.saveShowOverlays(this.showOverlays);
-        }
+        this.preferences.saveShowOverlays(this.showOverlays);
         
         // Sync collision overlay setting with interior renderer
         if (this.interiorRenderer) {
@@ -4413,6 +3377,9 @@ ${sign.scriptText.hexString}
         if (overlaysCheckbox) {
             overlaysCheckbox.checked = this.showOverlays;
         }
+        
+
+        
         // Force immediate render
         this.isRendering = false; // Reset render lock
         this.render();
@@ -4420,27 +3387,15 @@ ${sign.scriptText.hexString}
     
     toggleGrid() {
         this.showGrid = !this.showGrid;
-        
-        // Save to appropriate storage based on mode
-        if (this.config.isGameMode()) {
-            this.preferences.saveGameShowGrid(this.showGrid);
-        } else {
-            this.preferences.saveShowGrid(this.showGrid);
-        }
-        
+        this.preferences.saveShowGrid(this.showGrid);
+
         this.render();
     }
     
     toggleCoordLabels() {
         this.showCoordLabels = !this.showCoordLabels;
-        
-        // Save to appropriate storage based on mode
-        if (this.config.isGameMode()) {
-            this.preferences.saveGameShowCoordLabels(this.showCoordLabels);
-        } else {
-            this.preferences.saveShowCoordLabels(this.showCoordLabels);
-        }
-        
+        this.preferences.saveShowCoordLabels(this.showCoordLabels);
+
         this.render();
     }
     
@@ -4510,6 +3465,8 @@ ${sign.scriptText.hexString}
             this.showingInteriorLayout = false;
             this.interiorLayoutManager.clearCurrentLayout();
             this.preferences.saveShowInteriorLayout(false);
+            
+
             this.render();
         } else {
             // Check if this is an interior map
@@ -4524,6 +3481,7 @@ ${sign.scriptText.hexString}
             }
             
             // Analyze and build layout
+
             const layout = await this.interiorLayoutManager.analyzeInteriorMapLayout(currentMap.mapId);
             
             if (!layout) {
@@ -4580,6 +3538,8 @@ ${sign.scriptText.hexString}
         
         this.viewportState.offsetX = offsetX;
         this.viewportState.offsetY = offsetY;
+        
+        Logger.log(`📍 Interior layout centered on main room ${currentMap.mapId} at top-left position (${offsetX.toFixed(0)}, ${offsetY.toFixed(0)})`);
     }
     
     /**
@@ -4616,12 +3576,20 @@ ${sign.scriptText.hexString}
         
         this.viewportState.offsetX = centerX;
         this.viewportState.offsetY = centerY;
+        
+        Logger.log(`📍 Interior layout centered at (${centerX}, ${centerY})`);
     }
     
     printCollisionData() {
         console.clear();
+
+
+
+        
         if (!this.currentMap) {
+
         } else {
+            console.log(`\nCurrent Map: ${this.currentMap.name} (ID: ${this.currentMap.id})`);
         }
         
         // Get tileset ID
@@ -4630,19 +3598,29 @@ ${sign.scriptText.hexString}
         // If no map loaded, use first available tileset
         if (tilesetId === null) {
             const availableTilesets = Object.keys(this.tilesetManager.tilesetCollisionData || {});
+
             if (availableTilesets.length > 0) {
                 tilesetId = parseInt(availableTilesets[0]);
+
             } else {
                 console.error('No tileset data available!');
+
                 return;
             }
         }
+        
+
+        
         const collisionData = this.tilesetManager.tilesetCollisionData[tilesetId];
         
         if (!collisionData) {
             console.warn(`⚠️  No collision data found for tileset ${tilesetId}`);
+            console.log('\n� Available tilesets:', Object.keys(this.tilesetManager.tilesetCollisionData));
             return;
         }
+        
+        console.log(`📦 Total Collision Entries: ${Object.values(collisionData).length}`);
+        
         // Calculate statistics
         const stats = {
             walkable: 0,
@@ -4660,13 +3638,20 @@ ${sign.scriptText.hexString}
             const type = entry.type || 'UNKNOWN';
             stats.types[type] = (stats.types[type] || 0) + 1;
         });
+        
+        console.log(`\n🚶 Walkable Tiles: ${stats.walkable} (${(stats.walkable/Object.values(collisionData).length*100).toFixed(1)}%)`);
+        console.log(`🚫 Blocked Tiles: ${stats.blocked} (${(stats.blocked/Object.values(collisionData).length*100).toFixed(1)}%)`);
+        
+
         Object.entries(stats.types)
             .sort((a, b) => b[1] - a[1])
             .forEach(([type, count]) => {
                 const pct = (count/Object.values(collisionData).length*100).toFixed(1);
+                console.log(`   ${type.padEnd(20)} ${count.toString().padStart(3)} (${pct}%)`);
             });
         
         // Sample tiles
+        console.log('\n🔍 Sample Collision Values (first 20):');
         console.table(
             Object.values(collisionData).slice(0, 20).map(entry => ({
                 'Tile ID': entry.tileId,
@@ -4679,19 +3664,38 @@ ${sign.scriptText.hexString}
         );
         
         // Full data
+
+
+        
+
+
+
     }
     
     async analyzeConnections() {
         console.clear();
+
+
+
+        
         const currentMap = this.mapState.getCurrentMap();
         if (!currentMap) {
+
             Logger.warn('Load a map first before analyzing connections');
             return;
         }
+        console.log(`\n📍 Current Map: ${currentMap.name} (ID: ${currentMap.id})`);
+
+        console.log(`   Tileset: ${currentMap.tilesetName} (ID: ${currentMap.tileset})`);
+        
         // Check if map has connections
         if (!currentMap.connections || Object.keys(currentMap.connections).length === 0) {
+
             return;
         }
+        
+        console.log(`\n🔗 Found ${Object.keys(currentMap.connections).length} connection(s)`);
+        
         // Track analysis results
         const analysisResults = [];
         
@@ -4704,9 +3708,15 @@ ${sign.scriptText.hexString}
             
             const header = currentMap.connectionHeaders[direction];
             const connectedMapId = header.connectedMap;
+            
+            console.log(`\n${'─'.repeat(55)}`);
+            console.log(`📌 ${direction.toUpperCase()} Connection`);
+            console.log(`${'─'.repeat(55)}`);
+            
             // Load connected map
             const connectedMap = await this.mapDataManager.loadMapByIndex(connectedMapId);
             if (!connectedMap) {
+
                 continue;
             }
             
@@ -4733,13 +3743,37 @@ ${sign.scriptText.hexString}
                 ...result
             });
         }
+        
+        console.log(`\n${'═'.repeat(55)}`);
+
+        console.log(`${'═'.repeat(55)}`);
+        
         const needsAdjustment = analysisResults.filter(r => r.shouldAdjust);
         const alreadyOptimal = analysisResults.filter(r => !r.shouldAdjust && r.currentScore > 0);
         const noWalkable = analysisResults.filter(r => r.currentScore === 0 && r.optimalScore === 0);
+        
+
+
+
+        
         if (needsAdjustment.length > 0) {
+
             needsAdjustment.forEach((result, index) => {
+                console.log(`\n  ${index + 1}. ${result.direction.toUpperCase()}:`);
+                console.log(`     Current: ${result.currentAlignment}px (score: ${result.currentScore})`);
+                console.log(`     Optimal: ${result.optimalAlignment}px (score: ${result.optimalScore})`);
+
             });
+            
+
+            console.log(`   Run: mapViewer.applyOptimalAlignments()`);
+
         }
+        
+        console.log(`\n${'═'.repeat(55)}`);
+
+        console.log(`${'═'.repeat(55)}\n`);
+        
         Logger.success('Connection alignment analysis printed to console');
         
         // Return results for potential programmatic use
@@ -4756,6 +3790,9 @@ ${sign.scriptText.hexString}
             Logger.warn('No map loaded');
             return;
         }
+        
+
+        
         let adjustmentCount = 0;
         const directions = ['north', 'south', 'east', 'west'];
         
@@ -4804,6 +3841,7 @@ ${sign.scriptText.hexString}
             Logger.success(`Applied ${adjustmentCount} alignment adjustment(s). Re-rendering...`);
             await this.render();
         } else {
+
         }
     }
     
@@ -4859,8 +3897,7 @@ ${sign.scriptText.hexString}
             'NPCMovement': NPC_MOVEMENT_VERSION,
             'TileAnimator': TILE_ANIMATOR_VERSION,
             'InteriorLayoutManager': INTERIOR_LAYOUT_VERSION,
-            'InteriorRenderer': INTERIOR_RENDERER_VERSION,
-            'NotificationManager': NOTIFICATION_VERSION
+            'InteriorRenderer': INTERIOR_RENDERER_VERSION
         };
     }
     
@@ -4889,44 +3926,9 @@ ${sign.scriptText.hexString}
         }
     }
     
-    /**
-     * Update game mode footer with current map name and FPS
-     */
-    updateGameFooter() {
-        // Update map name
-        const mapNameElement = document.getElementById('currentMapName');
-        if (mapNameElement && this.player && this.player.currentMapId !== null) {
-            const currentMap = this.mapCache?.getMap(this.player.currentMapId);
-            if (currentMap) {
-                mapNameElement.textContent = currentMap.name;
-            }
-        }
-        
-        // Update path progress notification (not in footer)
-        if (this.notificationManager && this.player) {
-            if (this.player.isFollowingPath()) {
-                const currentPath = this.player.getPath();
-                const pathIndex = this.player.getPathIndex();
-                
-                if (currentPath && currentPath.length > 0) {
-                    this.notificationManager.showPathProgress(pathIndex, currentPath.length);
-                }
-            } else {
-                // Dismiss path progress when not following a path
-                this.notificationManager.dismissPathProgress();
-            }
-        }
-        
-        // FPS is automatically updated by FPSCounter.tick() in the game loop
-        // Just make sure the display element is connected
-        const fpsElement = document.getElementById('fpsDisplayGame');
-        if (fpsElement && this.fpsCounter && !this.fpsCounter.displayElement) {
-            this.fpsCounter.setDisplayElement(fpsElement);
-        }
-    }
-    
     async loadMapList() {
         try {
+
             const data = await this.mapDataManager.loadMapIndex();
             
             // In game mode, restore saved game state or start new game
@@ -4935,6 +3937,7 @@ ${sign.scriptText.hexString}
                 
                 if (savedState && savedState.mapId !== null) {
                     // Restore saved game
+                    Logger.log(`[Game] Restoring saved game: Map ${savedState.mapId} at (${savedState.playerX}, ${savedState.playerY}), facing ${savedState.facing}`);
                     await this.loadMap(savedState.mapId);
                     
                     // Restore player position and facing
@@ -4946,6 +3949,7 @@ ${sign.scriptText.hexString}
                     }
                 } else {
                     // Start new game in Pallet Town
+                    Logger.log('[Game] Starting new game in Pallet Town (ID: 0)');
                     await this.loadMap(0);
                 }
                 
@@ -4970,6 +3974,9 @@ ${sign.scriptText.hexString}
             );
             const routes = sortedMaps.filter(m => m.name.includes('Route'));
             const indoors = sortedMaps.filter(m => !towns.includes(m) && !routes.includes(m));
+            
+
+            
             // Create sections
             this.createMapSection(mapList, 'Towns & Cities', towns);
             this.createMapSection(mapList, 'Routes', routes);
@@ -4986,11 +3993,13 @@ ${sign.scriptText.hexString}
             if (savedMapId) {
                 const savedMap = sortedMaps.find(m => m.mapId === savedMapId);
                 if (savedMap) {
+                    Logger.log(`Restoring saved map: ${savedMap.name} (ID: ${savedMap.mapId})`);
                     mapToLoad = savedMap.mapId;
                 }
             }
             
             if (mapToLoad === null && towns.length > 0) {
+                Logger.log(`Loading default map: ${towns[0].name} (ID: ${towns[0].mapId})`);
                 mapToLoad = towns[0].mapId;
             }
             
@@ -5038,20 +4047,24 @@ ${sign.scriptText.hexString}
             
             // Load tileset if needed
             if (!this.tilesetManager.hasTileset(mapData.tileset)) {
+
                 await this.tilesetManager.loadTileset(mapData.tileset, mapData.tilesetName);
             }
             
             // Load tileset block definitions if needed
             if (!this.tilesetManager.hasBlockDefinitions(mapData.tileset)) {
+
                 await this.tilesetManager.loadTilesetBlocks(mapData.tileset);
             }
             
             // Load sprite metadata if needed
             if (mapData.objects?.sprites?.data && mapData.objects.sprites.data.length > 0) {
+
                 const spriteIds = mapData.objects.sprites.data.map(s => s.pictureId);
                 await this.spriteManager.preloadSprites(spriteIds);
                 
                 // Initialize movement engine with sprite data
+
                 this.movementEngine.setTilesetManager(this.tilesetManager);
                 this.movementEngine.setCurrentMap(mapData);
                 this.movementEngine.initializeSprites(mapData.objects.sprites.data);
@@ -5108,15 +4121,13 @@ ${sign.scriptText.hexString}
                 this.camera.focusOnPlayer(this.player.state.pixelX, this.player.state.pixelY);
                 this.camera.setPosition(this.camera.targetOffsetX, this.camera.targetOffsetY); // Snap immediately, no smoothing
                 
-                // Update game mode footer with map name
-                this.updateGameFooter();
+                Logger.log(`Player spawned at player-tile (${spawnX}, ${spawnY}) = block (${spawnBlockX}, ${spawnBlockY})`);
+                Logger.log(`Camera centered on player at pixel (${this.player.state.pixelX}, ${this.player.state.pixelY}) with zoom ${this.viewportState.scale}x`);
             } else if (this.config.isGameMode() && this.camera && skipPlayerSpawn) {
                 // Just update camera boundaries when skipping spawn
                 this.camera.setMapBoundaries(mapData.widthPixels, mapData.heightPixels);
                 this.camera.setZoom(this.viewportState.scale);
-                
-                // Update game mode footer
-                this.updateGameFooter();
+
             }
             
             // Check if we should enable interior layout mode (ONLY in map-viewer mode)
@@ -5128,6 +4139,7 @@ ${sign.scriptText.hexString}
                 // Apply interior layout if preference is enabled and this is an interior map
                 if (savedInteriorLayoutPref && isInterior) {
                     this.showingInteriorLayout = true;
+
                     try {
                         // Clear layout and cache to rebuild from current map as root
                         this.interiorLayoutManager.clearCurrentLayout();
@@ -5159,6 +4171,7 @@ ${sign.scriptText.hexString}
             if (!suppressErrorUI) {
                 this.errorHandler.handle(error, `Loading map ${mapId}`);
             } else {
+
             }
             throw error; // Rethrow so caller can handle it
         }

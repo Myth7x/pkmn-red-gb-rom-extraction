@@ -363,14 +363,41 @@ export class UIBuilder {
     /**
      * Build the version footer
      */
-    static buildVersionFooter() {
+    static buildVersionFooter(isGameMode = false) {
         const footer = document.createElement('div');
-        footer.id = 'versionFooter';
         
-        footer.innerHTML = `
-            <div class="main-version">Map Viewer v3.0.2 | Loading... | Maps: <span id="mapsCount">0</span> | FPS: <span id="fpsDisplay">--</span></div>
-            <div class="modules">Modules: Loading...</div>
-        `;
+        if (isGameMode) {
+            // Game mode footer
+            footer.id = 'gameFooter';
+            footer.className = 'app-footer';
+            footer.innerHTML = `
+                <div class="footer-section">
+                    <span class="footer-label">Map:</span>
+                    <span id="currentMapName" class="footer-value">Loading...</span>
+                </div>
+                <div class="footer-section town-navigation" id="townNavigation">
+                    <label for="townSelect" class="footer-label">🗺️ Go to:</label>
+                    <select id="townSelect" class="form-select form-select-sm">
+                        <option value="" disabled selected>Select a town...</option>
+                    </select>
+                    <button id="navigateToTownBtn" class="btn btn-sm btn-success" disabled>
+                        <i class="bi bi-compass"></i> Navigate
+                    </button>
+                </div>
+                <div class="footer-section">
+                    <span class="footer-label">FPS:</span>
+                    <span id="fpsDisplayGame" class="footer-value">--</span>
+                </div>
+            `;
+        } else {
+            // Map viewer mode footer
+            footer.id = 'mapViewerFooter';
+            footer.className = 'app-footer';
+            footer.innerHTML = `
+                <div class="main-version">Map Viewer v3.0.2 | Loading... | Maps: <span id="mapsCount">0</span> | FPS: <span id="fpsDisplay">--</span></div>
+                <div class="modules">Modules: Loading...</div>
+            `;
+        }
         
         return footer;
     }

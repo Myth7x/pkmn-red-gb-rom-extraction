@@ -75,14 +75,19 @@ function bankPointerToOffset(bank, pointer) {
  * @returns {Object} - Connection data
  */
 function readConnectionHeader(rom, offset) {
+  // Read alignment as signed bytes (they can be negative offsets)
+  const yAlignmentByte = rom[offset + CONNECTION_OFFSETS.Y_ALIGNMENT];
+  const xAlignmentByte = rom[offset + CONNECTION_OFFSETS.X_ALIGNMENT];
+  
   return {
     connectedMap: rom[offset + CONNECTION_OFFSETS.CONNECTED_MAP],
     connectionStripSrc: rom.readUInt16LE(offset + CONNECTION_OFFSETS.CONNECTION_STRIP_SRC),
     connectionStripDest: rom.readUInt16LE(offset + CONNECTION_OFFSETS.CONNECTION_STRIP_DEST),
     connectionStripLength: rom[offset + CONNECTION_OFFSETS.CONNECTION_STRIP_LENGTH],
     connectedMapWidth: rom[offset + CONNECTION_OFFSETS.CONNECTED_MAP_WIDTH],
-    yAlignment: rom[offset + CONNECTION_OFFSETS.Y_ALIGNMENT],
-    xAlignment: rom[offset + CONNECTION_OFFSETS.X_ALIGNMENT],
+    // Convert to signed byte (two's complement)
+    yAlignment: yAlignmentByte > 127 ? yAlignmentByte - 256 : yAlignmentByte,
+    xAlignment: xAlignmentByte > 127 ? xAlignmentByte - 256 : xAlignmentByte,
     windowPtr: rom.readUInt16LE(offset + CONNECTION_OFFSETS.WINDOW_PTR)
   };
 }

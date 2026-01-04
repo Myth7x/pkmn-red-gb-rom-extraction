@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>Pokemon Red - Game Demo</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.2/font/bootstrap-icons.css">
+    
+    <!-- Custom Styles -->
+    <link rel="stylesheet" href="./styles/main.css">
+    
+    <style>
+        /* Game-specific styles */
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background: #000;
+        }
+        
+        #app {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        #gameContainer {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        #canvasWrapper {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #000;
+            position: relative;
+        }
+        
+        #container {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        #mapCanvas {
+            display: block;
+            image-rendering: pixelated;
+            image-rendering: -moz-crisp-edges;
+            image-rendering: crisp-edges;
+            background: #000;
+        }
+        
+        #gameControls {
+            background: rgba(0, 0, 0, 0.9);
+            padding: 15px 20px;
+            color: #fff;
+            font-family: 'Courier New', monospace;
+            border-top: 2px solid #444;
+            font-size: 0.9rem;
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 20px;
+        }
+        
+        .controls-section {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .key-group {
+            display: flex;
+            gap: 5px;
+            align-items: center;
+        }
+        
+        #gameControls kbd {
+            background: #333;
+            padding: 5px 10px;
+            border-radius: 3px;
+            border: 1px solid #555;
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            min-width: 30px;
+            text-align: center;
+            transition: all 0.1s ease;
+        }
+        
+        #gameControls kbd.active {
+            background: #4CAF50;
+            border-color: #66BB6A;
+            box-shadow: 0 0 10px rgba(76, 175, 80, 0.5);
+            transform: scale(1.1);
+        }
+        
+        .zoom-section {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        #zoomSliderGame {
+            width: 150px;
+            height: 4px;
+            -webkit-appearance: none;
+            appearance: none;
+            background: #555;
+            border-radius: 2px;
+            outline: none;
+        }
+        
+        #zoomSliderGame::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 14px;
+            height: 14px;
+            background: #4CAF50;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        
+        #zoomSliderGame::-webkit-slider-thumb:hover {
+            background: #66BB6A;
+        }
+        
+        #zoomSliderGame::-moz-range-thumb {
+            width: 14px;
+            height: 14px;
+            background: #4CAF50;
+            border-radius: 50%;
+            cursor: pointer;
+            border: none;
+            transition: background 0.2s;
+        }
+        
+        #zoomSliderGame::-moz-range-thumb:hover {
+            background: #66BB6A;
+        }
+        
+        #zoomValueDisplay {
+            min-width: 40px;
+            text-align: center;
+            color: #4CAF50;
+            font-weight: bold;
+        }
+        
+        /* Loading spinner */
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #fff;
+            font-family: 'Courier New', monospace;
+            font-size: 1.2rem;
+            z-index: 1000;
+            text-align: center;
+        }
+        
+        #loading.hidden {
+            display: none;
+        }
+        
+        .spinner {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid #fff;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body data-mode="game">
+    <div id="app">
+        <!-- Canvas will be inserted here by main.js -->
+    </div>
+    
+    <!-- Game Controls Help (overlay) -->
+    <div id="gameControls">
+        <div class="controls-section">
+            <strong>🎮 Move:</strong>
+            <div class="key-group">
+                <kbd id="key-w" data-key="w">W</kbd>
+                <kbd id="key-a" data-key="a">A</kbd>
+                <kbd id="key-s" data-key="s">S</kbd>
+                <kbd id="key-d" data-key="d">D</kbd>
+            </div>
+            <span style="color: #888;">or</span>
+            <div class="key-group">
+                <kbd id="key-up" data-key="arrowup">↑</kbd>
+                <kbd id="key-left" data-key="arrowleft">←</kbd>
+                <kbd id="key-down" data-key="arrowdown">↓</kbd>
+                <kbd id="key-right" data-key="arrowright">→</kbd>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS Bundle -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Key Press Handler -->
+    <script>
+        // Add key press visual feedback
+        document.addEventListener('keydown', (e) => {
+            const key = e.key.toLowerCase();
+            const keyElement = document.querySelector(`kbd[data-key="${key}"]`);
+            if (keyElement) {
+                keyElement.classList.add('active');
+            }
+        });
+        
+        document.addEventListener('keyup', (e) => {
+            const key = e.key.toLowerCase();
+            const keyElement = document.querySelector(`kbd[data-key="${key}"]`);
+            if (keyElement) {
+                keyElement.classList.remove('active');
+            }
+        });
+    </script>
+    
+    <!-- Game Application (ES6 Modules) -->
+    <script type="module" src="./js/main.js"></script>
+</body>
+</html>
